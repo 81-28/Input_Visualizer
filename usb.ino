@@ -176,11 +176,20 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance,
                                 uint8_t const* report, uint16_t len) {
   if (len == 0) return;
 
-  Serial1.print("HID Report: ");
-  for (uint16_t i = 0; i < len; i++) {
-    Serial1.printf("%02X ", report[i]);
-  }
-  Serial1.println();
+  // Serial1.print("HID Report: ");
+  // for (uint16_t i = 0; i < len; i++) {
+  //   Serial1.printf("%02X ", report[i]);
+  // }
+  // Serial1.println();
+  ++cnt;
+
+  const uint8_t start_byte = 0xAA;
+  const uint8_t end_byte = 0xBB;
+
+  Serial1.write(start_byte);
+  Serial1.write((uint8_t)len);
+  Serial1.write(report, len);
+  Serial1.write(end_byte);
 
   // 初期化シーケンスを進める
   if (is_procon && init_state != InitState::DONE) {
@@ -204,8 +213,6 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
     seq_counter = 0;                   // シーケンスカウンターもリセット
   }
 }
-
-unsigned long last_rumble = 0;
 
 void send_keepalive() {
   memset(&out_report, 0, sizeof(out_report));
@@ -238,9 +245,14 @@ struct repeating_timer timer;
 void setup() {
 
 }
-
+unsigned long last_check_time = 0;
 void loop() {
-
+  // unsigned long current_time = millis();
+  // if (current_time - last_check_time >= 1000) {
+  //   Serial1.printf("%d Hz\r\n", cnt);
+  //   cnt=0;
+  //   last_check_time = current_time;
+  // }
 }
 
 // ====== Core1: Process USB Host ======
@@ -271,7 +283,7 @@ void setup1() {
   // param2: コールバック関数
   // param3: コールバック関数の引数 (nullptr)
   // param4: タイマー構造体のポインタ
-  add_repeating_timer_us(-16666, repeating_keep_alive_cb, nullptr, &timer);
+  // add_repeating_timer_us(-16666, repeating_keep_alive_cb, nullptr, &timer);
 }
 
 // これ以外の処理は走らせない!!! 接続が不安定になる原因となり得る!!!
