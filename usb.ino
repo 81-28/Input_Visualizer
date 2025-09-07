@@ -175,13 +175,12 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance,
 void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance,
                                 uint8_t const* report, uint16_t len) {
   if (len == 0) return;
-  cnt++;
 
-  // Serial1.print("HID Report: ");
-  // for (uint16_t i = 0; i < len; i++) {
-  //   Serial1.printf("%02X ", report[i]);
-  // }
-  // Serial1.println();
+  Serial1.print("HID Report: ");
+  for (uint16_t i = 0; i < len; i++) {
+    Serial1.printf("%02X ", report[i]);
+  }
+  Serial1.println();
 
   // 初期化シーケンスを進める
   if (is_procon && init_state != InitState::DONE) {
@@ -225,7 +224,26 @@ void send_keepalive() {
   tuh_hid_send_report(procon_addr, procon_instance, 0, &out_report, 10);
 }
 
-// ====== Arduino setup/loop ======
+// ====== Hardware Timer ======
+bool repeating_keep_alive_cb(struct repeating_timer *t) {
+  if (is_procon && init_state == InitState::DONE) {
+    send_keepalive();
+  }
+  return true;
+}
+struct repeating_timer timer;
+
+
+// ====== Core 0: main logic ======
+void setup() {
+
+}
+
+void loop() {
+
+}
+
+// ====== Core1: Process USB Host ======
 
 void init_usb_host() {
   pio_usb_configuration_t pio_cfg = PIO_USB_DEFAULT_CONFIG;
@@ -235,32 +253,28 @@ void init_usb_host() {
   Serial1.println("USB host init done");
 }
 
-void setup() {
+void setup1() {
+  // UARTでシリアル通信開始
   Serial1.begin(115200);
   pixels.begin();
+
+  // 青色LED 
+  pixels.setPixelColor(0, pixels.Color(0, 0, 10));
+
+  // 電源等の安定待ち (これがないとProコンがコネクションを確立できない)
   delay(500);
+  pixels.show();
   init_usb_host();
+
+  // ハードウェアタイマー初期化
+  // param1: 実行間隔 (μs), -16666 -> 60Hz
+  // param2: コールバック関数
+  // param3: コールバック関数の引数 (nullptr)
+  // param4: タイマー構造体のポインタ
+  add_repeating_timer_us(-16666, repeating_keep_alive_cb, nullptr, &timer);
 }
 
-void loop() {
-  USBHost.task();
-  if (is_procon && init_state == InitState::DONE) {
-    unsigned long now = millis();
-    if (now - last_rumble > 15) { // 60Hzくらいで送信
-      send_keepalive();
-      last_rumble = now;
-    }
-  }
-}
-
-unsigned long start = millis();
-void setup1() {
-  cnt=0;
-}
-
+// これ以外の処理は走らせない!!! 接続が不安定になる原因となり得る!!!
 void loop1() {
-  if ((millis()-start)%1000==0) {
-    Serial1.printf("%dHz\r\n", cnt);
-    cnt=0;
-  }
+  USBHost.task();
 }
