@@ -152,7 +152,6 @@ void advance_init() {
 }
 
 // ====== TinyUSB Callbacks ======
-int cnt;
 
 void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance,
                       uint8_t const* desc_report, uint16_t desc_len) {
@@ -181,7 +180,6 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance,
   //   Serial1.printf("%02X ", report[i]);
   // }
   // Serial1.println();
-  ++cnt;
 
   const uint8_t start_byte = 0xAA;
   const uint8_t end_byte = 0xBB;
@@ -242,17 +240,13 @@ struct repeating_timer timer;
 
 
 // ====== Core 0: main logic ======
+
 void setup() {
 
 }
-unsigned long last_check_time = 0;
+
 void loop() {
-  // unsigned long current_time = millis();
-  // if (current_time - last_check_time >= 1000) {
-  //   Serial1.printf("%d Hz\r\n", cnt);
-  //   cnt=0;
-  //   last_check_time = current_time;
-  // }
+
 }
 
 // ====== Core1: Process USB Host ======
