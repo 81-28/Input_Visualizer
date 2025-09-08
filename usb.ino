@@ -75,7 +75,7 @@ struct OutputReport {
 void send_report(uint8_t size) {
   out_report.sequence_counter = seq_counter++ & 0x0F;
   if (!tuh_hid_send_report(procon_addr, procon_instance, 0, &out_report, size)) {
-    Serial1.println("send_report failed");
+    Serial1.printf("send_report failed. error_code=%d\r\n", init_state);
   }
 }
 
