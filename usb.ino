@@ -158,7 +158,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance,
                       uint8_t const* desc_report, uint16_t desc_len) {
   uint16_t vid, pid;
   if (tuh_vid_pid_get(dev_addr, &vid, &pid)) {
-    Serial1.printf("VID:%04X PID:%04X\n", vid, pid);
+    Serial1.printf("VID:%04X PID:%04X\r\n", vid, pid);
 
     if (vid == VID_NINTENDO && pid == PID_SWITCH_PRO) {
       Serial1.println("Switch Pro Controller detected!");
