@@ -25,12 +25,14 @@ def main():
         cnt = 0
         last_cnt = 0
 
+        start = time.time()
+
         while True:
             # 1. 開始バイト(0xAA)を待つ
             start_byte = ser.read(1)
             if start_byte != b'\xaa':
                 continue
-                
+
             # 2. データ長(1バイト)を読む
             length_byte = ser.read(1)
             if not length_byte:
@@ -53,8 +55,15 @@ def main():
                     last_cnt = cnt
                     freq = time.time()
                     cnt = 0
+
+                end = time.time()
+                elapsed = end - start
+                h = int(elapsed // 3600)
+                m = int((elapsed % 3600) // 60)
+                s = int(elapsed % 60)
+
                 # 5. 受信成功
-                print(f"Freq: {last_cnt} Hz, Received {data_length} bytes: ", end="")
+                print(f"Time: {h:02d}:{m:02d}:{s:02d}, Freq: {last_cnt} Hz, Received {data_length} bytes: ", end="")
                 print_hex(payload)
             else:
                 print("Error: Frame end byte mismatch.")
