@@ -4,9 +4,15 @@ import time
 # 必須: PySerial
 # pip install pyserial
 
-SERIAL_PORT_NAME = 'COM6'  # 環境に合わせて変更
+SERIAL_PORT_NAME = 'COM9'  # 環境に合わせて変更
 
 BAUD_RATE = 115200
+
+button_names = [
+    "DOWN", "UP", "RIGHT", "LEFT", "", "", "L", "ZL",
+    "SELECT", "START", "R3", "L3", "HOME", "CAPTURE", "HOGE", "FUGA",
+    "Y", "X", "B", "A", "", "", "R", "ZR"
+]
 
 # バイト配列を16進数の文字列に変換して表示
 def print_hex(data):
@@ -65,6 +71,14 @@ def main():
                 # 5. 受信成功
                 print(f"Time: {h:02d}:{m:02d}:{s:02d}, Freq: {last_cnt} Hz, Received {data_length} bytes: ", end="")
                 print_hex(payload)
+                # ボタン状態の解析
+                button_byte = payload[3:6]
+                print_hex(button_byte)
+                button_bits = int.from_bytes(button_byte, 'big')
+                for i in range(24):
+                    if button_bits & (1 << i):
+                        name = button_names[i] if i < len(button_names) else f"Button {i}"
+                        print(f"{name} is pressed.")
             else:
                 print("Error: Frame end byte mismatch.")
 
