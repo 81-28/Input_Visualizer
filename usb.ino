@@ -273,11 +273,12 @@ void setup1() {
   init_usb_host();
 
   // ハードウェアタイマー初期化
-  // param1: 実行間隔 (μs), -16666 -> 60Hz (params1 < 0 -> 実行時間を考慮せずタイマー発動)
+  // これを実行するとポーリングレートが75Hzでなんか安定する
+  // param1: 実行間隔 (μs), -8000 -> 125Hz (params1 < 0 -> 実行時間を考慮せずタイマー発動)
   // param2: コールバック関数
   // param3: コールバック関数の引数 (nullptr)
   // param4: タイマー構造体のポインタ
-  // add_repeating_timer_us(-16666, repeating_keep_alive_cb, nullptr, &timer);
+  add_repeating_timer_us(-8000, repeating_keep_alive_cb, nullptr, &timer);
 }
 
 // これ以外の処理は走らせない!!! 接続が不安定になる原因となり得る!!!
