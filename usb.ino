@@ -118,31 +118,34 @@ void advance_init() {
       break;
 
     case InitState::LED_HOME:
-      Serial1.println("led home");
-      out_report.command = 0x01;
-      out_report.sub_command = 0x38; // Home LED
+      report_size = 14;
+
+      out_report.command = SwitchPro::CMD::AND_RUMBLE;
+      out_report.sub_command = SwitchPro::CMD::LED_HOME;
       out_report.sub_command_args[0] = 0x0F;
       out_report.sub_command_args[1] = 0xF0;
       out_report.sub_command_args[2] = 0xF0;
-      send_report(14);
+      send_report(report_size);
       init_state = InitState::FULL_REPORT;
       break;
 
     case InitState::FULL_REPORT:
-      Serial1.println("full report");
-      out_report.command = 0x01;
-      out_report.sub_command = 0x03; // Input report mode
-      out_report.sub_command_args[0] = 0x30; // Full report mode
-      send_report(12);
+      report_size = 12;
+
+      out_report.command = SwitchPro::CMD::AND_RUMBLE;
+      out_report.sub_command = SwitchPro::CMD::MODE;
+      out_report.sub_command_args[0] = SwitchPro::CMD::FULL_REPORT_MODE;
+      send_report(report_size);
       init_state = InitState::IMU;
       break;
 
     case InitState::IMU:
-      Serial1.println("imu");
-      out_report.command = 0x01;
-      out_report.sub_command = 0x40; // Enable IMU
+      report_size = 12;
+
+      out_report.command = SwitchPro::CMD::AND_RUMBLE;
+      out_report.sub_command = SwitchPro::CMD::GYRO;
       out_report.sub_command_args[0] = 0x01; // 1=enable
-      send_report(12);
+      send_report(report_size);
       init_state = InitState::DONE;
       break;
 
