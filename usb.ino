@@ -184,6 +184,7 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance,
 
   const uint8_t start_byte = 0xAA;
   const uint8_t end_byte = 0xBB;
+  len = 13;
 
   Serial1.write(start_byte);
   Serial1.write((uint8_t)len);
