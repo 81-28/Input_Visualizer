@@ -3,6 +3,33 @@
 #include <iomanip>
 #include <asio.hpp>
 
+using Clock = std::chrono::high_resolution_clock;
+using TimePoint = std::chrono::time_point<Clock>;
+
+auto get_time() { 
+	return Clock::now(); 
+}
+
+long long calc_time_ms(TimePoint start, TimePoint end) { 
+	return std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count(); 
+}
+
+long long calc_time_sec(TimePoint start, TimePoint end) {
+	return std::chrono::duration_cast<std::chrono::seconds>(end - start).count();
+}
+
+void print_elapsed_time(long long elapsed) {
+	int h, m, s;
+	h = elapsed / 3600;
+	elapsed %= 3600;
+	m = elapsed / 60;
+	elapsed %= 60;
+	s = elapsed;
+	
+	std::cout << std::setw(2) << std::setfill('0') << h << ":" 
+			  << std::setw(2) << std::setfill('0') << m << ":" 
+			  << std::setw(2) << std::setfill('0') << s << " ";
+}
 
 void open_serial_port(asio::serial_port& port, std::string port_name) {
 	try {
@@ -35,6 +62,11 @@ int main() {
 
 	open_serial_port(port, port_name);
 
+	uint16_t cnt = 0;
+	uint16_t freq = 0;
+	auto start = get_time();
+	auto program_start = get_time();
+
 	while (true) {
 		try {
 			// 1. 開始バイトを待つ
@@ -58,8 +90,17 @@ int main() {
 				std::cerr << "Warning: Invalid end byte. Packet discarded." << std::endl;
 				continue;
 			}
+			++cnt;
+			auto end = get_time();
+			if (calc_time_ms(start, end) > 1000) {
+				freq = cnt;
+				cnt = 0;
+				start = end;
+			}
 
-			std::cout << "Received " << (int)length << " bytes";
+			std::cout << "Freq " << std::setw(2) << std::setfill(' ') << freq << " Hz ";
+			print_elapsed_time(calc_time_sec(program_start, end));
+			std::cout << "Received " << (int)length << " bytes ";
 			for (const auto& byte : in_report) {
 				std::cout << std::hex << std::setw(2) << std::setfill('0') << (int)byte << " ";
 			}
@@ -72,6 +113,5 @@ int main() {
 		}
 	}
 
-	open_serial_port(port, port_name);
 	return 0;
 }
