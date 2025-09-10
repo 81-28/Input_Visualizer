@@ -136,7 +136,8 @@ void advance_init() {
       out_report.sub_command = SwitchPro::CMD::MODE;
       out_report.sub_command_args[0] = SwitchPro::CMD::FULL_REPORT_MODE;
       send_report(report_size);
-      init_state = InitState::IMU;
+      // init_state = InitState::IMU;
+      init_state = InitState::DONE;
       break;
 
     case InitState::IMU:
