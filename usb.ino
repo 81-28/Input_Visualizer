@@ -1,9 +1,6 @@
 #include "pio_usb.h"
 #include "Adafruit_TinyUSB.h"
 #include "tusb.h"
-#include <stdio.h>
-#include "hardware/resets.h"
-
 
 #define HOST_PIN_DP 12  // PIO USB D+ ピン
 
