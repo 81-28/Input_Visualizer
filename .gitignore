@@ -6,3 +6,8 @@ debug/Visualizer.vcxproj.user
 /debug/Visualizer
 /debug/x64
 debug/Visualizer.sln
+/Visualizer/.vs
+Visualizer/Visualizer.sln
+Visualizer/Visualizer.vcxproj
+Visualizer/Visualizer.vcxproj.filters
+Visualizer/Visualizer.vcxproj.user
