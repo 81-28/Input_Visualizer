@@ -18,7 +18,7 @@ bool App::OnInit() {
 #endif
 
 	MainFrame* mainFrame = new MainFrame("draw shapes");
-	mainFrame->SetSize(800, 600);
+	mainFrame->SetSize(400, 300);
 	mainFrame->Centre();
 	mainFrame->Show(true);
 	return true;

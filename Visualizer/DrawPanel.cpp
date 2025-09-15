@@ -29,44 +29,87 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
     ClearBackground(gdc);
 
     // ペン定義
-	wxPen redPen  (*wxRED,   2, wxPENSTYLE_SOLID);
-	wxPen bluePen (*wxBLUE,  2, wxPENSTYLE_SOLID);
-	wxPen greenPen(*wxGREEN, 2, wxPENSTYLE_SOLID);
-	wxPen blackPen(*wxBLACK, 2, wxPENSTYLE_SOLID);
-	wxPen whitePen(*wxWHITE, 2, wxPENSTYLE_SOLID);
+	wxPen redPen  (*wxRED,   3, wxPENSTYLE_SOLID);
+	wxPen bluePen (*wxBLUE,  3, wxPENSTYLE_SOLID);
+	wxPen greenPen(*wxGREEN, 3, wxPENSTYLE_SOLID);
+	wxPen blackPen(*wxBLACK, 3, wxPENSTYLE_SOLID);
+	wxPen whitePen(*wxWHITE, 3, wxPENSTYLE_SOLID);
 
     SwitchPro::GamePad gamepad = dynamic_cast<MainFrame*>(GetParent())->m_serial->GetGamePad();
 
+    short radius;
+    short center_x;
+    short center_y;
+    short offset;
+    double stick_x, stick_y;
 
+	// Lスティック
     gdc.SetPen(whitePen);
 	gdc.SetBrush(*wxTRANSPARENT_BRUSH);
 
-	uint8_t button_radius = 12;
+    // 八角形(外枠)
+    // 中心(50, 100)，半径35
+    center_x = 50;
+    center_y = 100;
+    radius = 35;
 
-    // X, B
-	gdc.DrawCircle(400, 300, button_radius);
-	gdc.DrawCircle(400, 350, button_radius);
+    wxPoint points[8];
+    for (int i = 0; i < 8; ++i) {
+        double angle = i * (2 * M_PI / 8);
+        points[i] = wxPoint(center_x + radius * cos(angle), center_y + radius * sin(angle));
+    }
+    gdc.DrawPolygon(8, points);
 
-	// A, Y
-	gdc.DrawCircle(425, 325, button_radius);
-	gdc.DrawCircle(375, 325, button_radius);
+    // スティック
+    radius = 20;
+	gdc.SetBrush(*wxBLACK);
+  
+    stick_x = center_x + (double)gamepad.LX / 2048 * radius;
+    stick_y = center_y - (double)gamepad.LY / 2048 * radius;
+	gdc.DrawCircle(stick_x, stick_y, radius);
 
+    if (gamepad.L3) {
+        std::cout << "idioaisoiosa" << std::endl;
+        gdc.SetBrush(*wxWHITE);
+        gdc.DrawCircle(stick_x, stick_y, radius);
+    }
+
+
+
+	// A, B, X, Yボタン
+    gdc.SetPen(whitePen);
+    gdc.SetBrush(*wxTRANSPARENT_BRUSH);
+
+    radius = 12;
+    center_x = 240;
+    center_y = 100;
+    offset = 25;
+  
+    // 押されてない
+    gdc.DrawCircle(center_x + offset, center_y, radius); // A
+	gdc.DrawCircle(center_x, center_y + offset, radius); // B
+	gdc.DrawCircle(center_x, center_y - offset, radius); // X
+	gdc.DrawCircle(center_x - offset, center_y, radius); // Y
+
+	// 押されてる
+    if (gamepad.A) {
+        gdc.SetBrush(*wxWHITE);
+        gdc.DrawCircle(center_x + offset, center_y, radius);
+    }
+    if (gamepad.B) {
+        gdc.SetBrush(*wxWHITE);
+        gdc.DrawCircle(center_x, center_y + offset, radius);
+    }
     if (gamepad.X) {
         gdc.SetBrush(*wxWHITE);
-        gdc.DrawCircle(400, 300, button_radius);
+        gdc.DrawCircle(center_x, center_y - offset, radius);
     }
-	if (gamepad.B) {
-		gdc.SetBrush(*wxWHITE);
-		gdc.DrawCircle(400, 350, button_radius);
-	}
-	if (gamepad.A) {
-		gdc.SetBrush(*wxWHITE);
-		gdc.DrawCircle(425, 325, button_radius);
-	}
-	if (gamepad.Y) {
-		gdc.SetBrush(*wxWHITE);
-		gdc.DrawCircle(375, 325, button_radius);
-	}
+    if (gamepad.Y) {
+        gdc.SetBrush(*wxWHITE);
+        gdc.DrawCircle(center_x - offset, center_y, radius);
+    }
+
+
 
    
 
@@ -74,14 +117,7 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
     wxPen anyColorPen(wxColour(255, 100, 100), 2);
     gdc.SetPen(anyColorPen);
 
-    // 八角形の頂点を計算
-    // 中心(500, 100)，半径50
-    wxPoint points[8];
-    for (int i = 0; i < 8; i++) {
-        double angle = i * (2 * M_PI / 8);
-        points[i] = wxPoint(500 + 50 * cos(angle), 100 + 50 * sin(angle));
-    }
-    gdc.DrawPolygon(8, points);
+
 
     // 内部を塗りつぶし
     gdc.SetBrush(wxBrush(*wxWHITE));
