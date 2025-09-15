@@ -73,22 +73,22 @@ void SerialAnalizer::ReadLoop() {
 			rep.buttons[0] & SwitchPro::Buttons0::B ? gp.B = 1 : gp.B = 0;
 			rep.buttons[0] & SwitchPro::Buttons0::X ? gp.X = 1 : gp.X = 0;
 			rep.buttons[0] & SwitchPro::Buttons0::Y ? gp.Y = 1 : gp.Y = 0;
-			rep.buttons[0] & SwitchPro::Buttons2::L ? gp.L = 1 : gp.L = 0;
+			rep.buttons[2] & SwitchPro::Buttons2::L ? gp.L = 1 : gp.L = 0;
 			rep.buttons[0] & SwitchPro::Buttons0::R ? gp.R = 1 : gp.R = 0;
-			rep.buttons[0] & SwitchPro::Buttons1::L3 ? gp.L3 = 1 : gp.L3 = 0;
-			rep.buttons[0] & SwitchPro::Buttons1::R3 ? gp.R3 = 1 : gp.R3 = 0;
+			rep.buttons[1] & SwitchPro::Buttons1::L3 ? gp.L3 = 1 : gp.L3 = 0;
+			rep.buttons[1] & SwitchPro::Buttons1::R3 ? gp.R3 = 1 : gp.R3 = 0;
 			rep.buttons[1] & SwitchPro::Buttons1::MINUS ? gp.MINUS = 1 : gp.MINUS = 0;
 			rep.buttons[1] & SwitchPro::Buttons1::PLUS ? gp.PLUS = 1 : gp.PLUS = 0;
 			rep.buttons[1] & SwitchPro::Buttons1::HOME ? gp.HOME = 1 : gp.HOME = 0;
 			rep.buttons[1] & SwitchPro::Buttons1::CAPTURE ? gp.CAPTURE = 1 : gp.CAPTURE = 0;
 
-			rep.buttons[1] & SwitchPro::Buttons2::DPAD_UP ? gp.DPAD_UP = 1 : gp.DPAD_UP = 0;
-			rep.buttons[1] & SwitchPro::Buttons2::DPAD_DOWN ? gp.DPAD_DOWN = 1 : gp.DPAD_DOWN = 0;
-			rep.buttons[1] & SwitchPro::Buttons2::DPAD_LEFT ? gp.DPAD_LEFT = 1 : gp.DPAD_LEFT = 0;
-			rep.buttons[1] & SwitchPro::Buttons2::DPAD_RIGHT ? gp.DPAD_RIGHT = 1 : gp.DPAD_RIGHT = 0;
+			rep.buttons[2] & SwitchPro::Buttons2::DPAD_UP ? gp.DPAD_UP = 1 : gp.DPAD_UP = 0;
+			rep.buttons[2] & SwitchPro::Buttons2::DPAD_DOWN ? gp.DPAD_DOWN = 1 : gp.DPAD_DOWN = 0;
+			rep.buttons[2] & SwitchPro::Buttons2::DPAD_LEFT ? gp.DPAD_LEFT = 1 : gp.DPAD_LEFT = 0;
+			rep.buttons[2] & SwitchPro::Buttons2::DPAD_RIGHT ? gp.DPAD_RIGHT = 1 : gp.DPAD_RIGHT = 0;
 
 			rep.buttons[2] & SwitchPro::Buttons2::ZL ? gp.ZL = 1 : gp.ZL = 0;
-			rep.buttons[2] & SwitchPro::Buttons0::ZR ? gp.ZR = 1 : gp.ZR = 0;
+			rep.buttons[0] & SwitchPro::Buttons0::ZR ? gp.ZR = 1 : gp.ZR = 0;
 
 			uint16_t lx = rep.joysticks[0] | ((rep.joysticks[1] & 0x0F) << 8);
 			uint16_t ly = (rep.joysticks[1] >> 4) | (rep.joysticks[2] << 4);
