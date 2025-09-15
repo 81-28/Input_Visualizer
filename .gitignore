@@ -1,12 +1,3 @@
-/Visualizer/lib
-/Visualizer/.vs
-Visualizer/Visualizer.sln
-Visualizer/Visualizer.vcxproj
-Visualizer/Visualizer.vcxproj.filters
-Visualizer/Visualizer.vcxproj.user
-/Visualizer/Visualizer
-/Visualizer/x64
-
 /debug/.vs
 /debug/lib
 debug/Visualizer.vcxproj
