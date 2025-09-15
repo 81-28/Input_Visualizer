@@ -154,12 +154,44 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 	gdc.SetBrush(*wxTRANSPARENT_BRUSH);
 	center_x = 110;
 	center_y = 170;
-	offset = 6;
-    short size = 8;
+	//offset = 0;
+    short size = 10;
+
+    {
+        // 十字キーの座標計算
+		short cx = center_x;
+		short cy = center_y;
+        short core = 2 * size;
+		short arm = 2 * size;
+
+        std::vector<wxPoint> pts;
+        // 上
+        pts.push_back(wxPoint(cx - core / 2, cy - core / 2));
+        pts.push_back(wxPoint(cx - core / 2, cy - core / 2 - arm));
+		pts.push_back(wxPoint(cx + core / 2, cy - core / 2 - arm));
+
+		// 右
+		pts.push_back(wxPoint(cx + core / 2, cy - core / 2));
+		pts.push_back(wxPoint(cx + core / 2 + arm, cy - core / 2));
+		pts.push_back(wxPoint(cx + core / 2 + arm, cy + core / 2));
+
+		// 下
+		pts.push_back(wxPoint(cx + core / 2, cy + core / 2));
+		pts.push_back(wxPoint(cx + core / 2, cy + core / 2 + arm));
+		pts.push_back(wxPoint(cx - core / 2, cy + core / 2 + arm));
+
+		// 左
+		pts.push_back(wxPoint(cx - core / 2, cy + core / 2));
+		pts.push_back(wxPoint(cx - core / 2 - arm, cy + core / 2));
+		pts.push_back(wxPoint(cx - core / 2 - arm, cy - core / 2));
+
+		gdc.DrawPolygon(pts.size(), pts.data());
+    }
+
+	// 押下時
     {
 		// 下
-        auto pts = CreateHomeBase(center_x, center_y + offset, size, 0);
-        gdc.DrawPolygon(pts.size(), pts.data());
+        auto pts = CreateHomeBase(center_x, center_y, size, 0);
 		if (gamepad.DPAD_DOWN) {
 			gdc.SetBrush(*wxWHITE);
 			gdc.DrawPolygon(pts.size(), pts.data());
@@ -168,8 +200,7 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
     }
 	{
 		// 左
-		auto pts = CreateHomeBase(center_x - offset, center_y, size, M_PI / 2);
-		gdc.DrawPolygon(pts.size(), pts.data());
+		auto pts = CreateHomeBase(center_x, center_y, size, M_PI / 2);
 		if (gamepad.DPAD_LEFT) {
 			gdc.SetBrush(*wxWHITE);
 			gdc.DrawPolygon(pts.size(), pts.data());
@@ -177,8 +208,7 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 		gdc.SetBrush(*wxTRANSPARENT_BRUSH);
 	}
 	{	// 上
-		auto pts = CreateHomeBase(center_x, center_y - offset, size, M_PI);
-		gdc.DrawPolygon(pts.size(), pts.data());
+		auto pts = CreateHomeBase(center_x, center_y, size, M_PI);
 		if (gamepad.DPAD_UP) {
 			gdc.SetBrush(*wxWHITE);
 			gdc.DrawPolygon(pts.size(), pts.data());
@@ -186,8 +216,7 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 		gdc.SetBrush(*wxTRANSPARENT_BRUSH);
 	}
 	{	// 右
-		auto pts = CreateHomeBase(center_x + offset, center_y, size, 3 * M_PI / 2);
-		gdc.DrawPolygon(pts.size(), pts.data());
+		auto pts = CreateHomeBase(center_x, center_y, size, 3 * M_PI / 2);
 		if (gamepad.DPAD_RIGHT) {
 			gdc.SetBrush(*wxWHITE);
 			gdc.DrawPolygon(pts.size(), pts.data());
