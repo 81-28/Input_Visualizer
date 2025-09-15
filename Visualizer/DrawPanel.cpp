@@ -35,6 +35,7 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 	wxPen yellowPen(*wxYELLOW, 3, wxPENSTYLE_SOLID);
 	wxPen blackPen (*wxBLACK,  3, wxPENSTYLE_SOLID);
 	wxPen whitePen (*wxWHITE,  3, wxPENSTYLE_SOLID);
+	wxPen whitePenS(*wxWHITE,  2, wxPENSTYLE_SOLID);
 
     SwitchPro::GamePad gamepad = dynamic_cast<MainFrame*>(GetParent())->m_serial->GetGamePad();
 
@@ -50,7 +51,7 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 
     // 八角形(外枠)
     center_x = 50;
-    center_y = 95;
+    center_y = 115;
     radius = 35;
 
     wxPoint points[8];
@@ -81,7 +82,7 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 
 	// 八角形(外枠)
 	center_x = 190;
-	center_y = 150;
+	center_y = 170;
 	radius = 32; // 少し小さめ
 
 	for (int i = 0; i < 8; ++i) {
@@ -106,13 +107,36 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 	}
 
 
+    // 十字キー
+
+    // -, +
+	gdc.SetPen(whitePenS);
+	gdc.SetBrush(*wxTRANSPARENT_BRUSH);
+    radius = 10;
+    center_x = 150;
+    center_y = 90;
+    offset = 36;
+
+	gdc.DrawCircle(center_x + offset, center_y, radius); // +
+	gdc.DrawCircle(center_x - offset, center_y, radius); // -
+
+	if (gamepad.PLUS) {
+		gdc.SetBrush(*wxWHITE);
+		gdc.DrawCircle(center_x + offset, center_y, radius);
+	}
+	if (gamepad.MINUS) {
+		gdc.SetBrush(*wxWHITE);
+		gdc.DrawCircle(center_x - offset, center_y, radius);
+	}
+
+
 	// A, B, X, Yボタン
     gdc.SetPen(whitePen);
     gdc.SetBrush(*wxTRANSPARENT_BRUSH);
 
     radius = 12;
     center_x = 240;
-    center_y = 100;
+    center_y = 120;
     offset = 25;
   
     // 押されてない
