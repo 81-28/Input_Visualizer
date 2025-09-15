@@ -100,7 +100,16 @@ public:
 
 private:
 	bool OpenSerialPort(std::string portName);
+    void CalcNeutral();
 	void ReadLoop();
+
+    const uint8_t startByte = 0xAA;
+    const uint8_t endByte = 0xBB;
+
+	uint16_t neutral_lx = 0;
+	uint16_t neutral_ly = 0;
+	uint16_t neutral_rx = 0;
+	uint16_t neutral_ry = 0;
 
 	asio::io_context io;
 	asio::serial_port port;

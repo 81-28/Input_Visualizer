@@ -8,6 +8,8 @@ SerialAnalizer::SerialAnalizer(const std::string portName) : port(io) {
 	if (!OpenSerialPort(portName)) {
 		throw std::runtime_error("Failed to open serial port");
 	}
+	CalcNeutral();
+	worker = std::thread(&SerialAnalizer::ReadLoop, this);
 }
 
 SerialAnalizer::~SerialAnalizer() {
@@ -27,8 +29,7 @@ bool SerialAnalizer::OpenSerialPort(std::string portName) {
 		port.set_option(asio::serial_port_base::stop_bits(asio::serial_port_base::stop_bits::one));
 		port.set_option(asio::serial_port_base::parity(asio::serial_port_base::parity::none));
 		port.set_option(asio::serial_port_base::flow_control(asio::serial_port_base::flow_control::none));
-
-		worker = std::thread(&SerialAnalizer::ReadLoop, this);
+		std::cout << "port opened" << std::endl;
 	}
 	catch (std::exception& e) {
 		std::cerr << "Serial port open error: " << e.what() << std::endl;
@@ -37,9 +38,77 @@ bool SerialAnalizer::OpenSerialPort(std::string portName) {
 	return true;
 }
 
+void SerialAnalizer::CalcNeutral() {
+	std::cout << "Calculating neutral position..." << std::endl;
+	int buf_lx[128] = { 0 };
+	int buf_ly[128] = { 0 };
+	int buf_rx[128] = { 0 };
+	int buf_ry[128] = { 0 };
+
+	// 20回のデータでニュートラルを計算
+	int n;
+	for (n = 0; n < 20; ++n) {
+		try {
+			uint8_t current_byte;
+			asio::read(port, asio::buffer(&current_byte, 1));
+			if (current_byte != startByte) continue;
+
+			uint8_t length;
+			asio::read(port, asio::buffer(&length, 1));
+
+			std::vector<uint8_t> in_report(length, 0);
+
+			asio::read(port, asio::buffer(in_report));
+			asio::read(port, asio::buffer(&current_byte, 1));
+
+			if (current_byte != endByte) {
+				std::cerr << "Invalid end byte" << std::endl;
+				continue;
+			}
+
+			SwitchPro::InReport rep;
+			std::copy(in_report.begin() + 6, in_report.begin() + 12, rep.joysticks);
+
+			uint16_t lx = rep.joysticks[0] | ((rep.joysticks[1] & 0x0F) << 8);
+			uint16_t ly = (rep.joysticks[1] >> 4) | (rep.joysticks[2] << 4);
+			uint16_t rx = rep.joysticks[3] | ((rep.joysticks[4] & 0x0F) << 8);
+			uint16_t ry = (rep.joysticks[4] >> 4) | (rep.joysticks[5] << 4);
+
+			buf_lx[n] = lx - 2048;
+			buf_ly[n] = ly - 2048;
+			buf_rx[n] = rx - 2048;
+			buf_ry[n] = ry - 2048;
+		}
+		catch (std::exception& e) {
+			std::cerr << "Serial port read error: " << e.what() << std::endl;
+			running = false;
+		}
+	}
+	int sum_lx = 0;
+	int sum_ly = 0;
+	int sum_rx = 0;
+	int sum_ry = 0;
+
+	for (int i = 0; i < n; ++i) {
+		sum_lx += buf_lx[i];
+		sum_ly += buf_ly[i];
+		sum_rx += buf_rx[i];
+		sum_ry += buf_ry[i];
+	}
+
+	std::cout << "Neutral LX: " << sum_lx / n << std::endl;
+	std::cout << "Neutral LY: " << sum_ly / n << std::endl;
+	std::cout << "Neutral RX: " << sum_rx / n << std::endl;
+	std::cout << "Neutral RY: " << sum_ry / n << std::endl;
+
+	neutral_lx = sum_lx / n;
+	neutral_ly = sum_ly / n;
+	neutral_rx = sum_rx / n;
+	neutral_ry = sum_ry / n;
+}
+
 void SerialAnalizer::ReadLoop() {
-	const uint8_t startByte = 0xAA;
-	const uint8_t endByte = 0xBB;
+
 
 	while (running) {
 		try {
@@ -95,10 +164,10 @@ void SerialAnalizer::ReadLoop() {
 			uint16_t rx = rep.joysticks[3] | ((rep.joysticks[4] & 0x0F) << 8);
 			uint16_t ry = (rep.joysticks[4] >> 4) | (rep.joysticks[5] << 4);
 
-			gp.LX = lx - 2048;
-			gp.LY = ly - 2048;
-			gp.RX = rx - 2048;
-			gp.RY = ry - 2048;
+			gp.LX = lx - 2048 - neutral_lx;
+			gp.LY = ly - 2048 - neutral_ly;
+			gp.RX = rx - 2048 - neutral_rx;
+			gp.RY = ry - 2048 - neutral_ry;
 			{
 				std::lock_guard<std::mutex> lock(mtx);
 				gamepad = gp;
