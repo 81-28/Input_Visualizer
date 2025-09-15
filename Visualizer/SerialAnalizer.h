@@ -36,8 +36,8 @@ namespace SwitchPro
     {
         static constexpr uint8_t MINUS = 0x01;
         static constexpr uint8_t PLUS = 0x02;
-        static constexpr uint8_t L3 = 0x04;
-        static constexpr uint8_t R3 = 0x08;
+        static constexpr uint8_t R3 = 0x04;
+        static constexpr uint8_t L3 = 0x08;
         static constexpr uint8_t HOME = 0x10;
         static constexpr uint8_t CAPTURE = 0x20;
     };

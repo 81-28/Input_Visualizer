@@ -95,8 +95,8 @@ void SerialAnalizer::ReadLoop() {
 			uint16_t rx = rep.joysticks[3] | ((rep.joysticks[4] & 0x0F) << 8);
 			uint16_t ry = (rep.joysticks[4] >> 4) | (rep.joysticks[5] << 4);
 
-			gp.LX = lx - 2048 - 23;
-			gp.LY = ly - 2048 - 45;
+			gp.LX = lx - 2048;
+			gp.LY = ly - 2048;
 			gp.RX = rx - 2048;
 			gp.RY = ry - 2048;
 			{

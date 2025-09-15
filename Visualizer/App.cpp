@@ -1,7 +1,7 @@
 ﻿#include "App.h"
 #include "MainFrame.h"
 
-#define DEBUG
+//#define DEBUG
 
 wxIMPLEMENT_APP(App);
 
