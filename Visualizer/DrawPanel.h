@@ -1,6 +1,7 @@
-#pragma once
+﻿#pragma once
 #include <wx/wx.h>
 #include <wx/dcgraph.h>
+#include "SerialAnalizer.h"
 
 class DrawPanel : public wxPanel
 {
@@ -13,7 +14,6 @@ private:
 	void OnTimer(wxTimerEvent& event);
 
 	wxTimer m_timer;
-	int m_index = 0;
 
 	wxDECLARE_EVENT_TABLE();
 };
