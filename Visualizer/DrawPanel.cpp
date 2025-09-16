@@ -106,16 +106,11 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
     // スティック
     radius = 20;
 	gdc.SetBrush(*wxBLACK);
+	gdc.SetPen(gamepad.L3 ? redPen : whitePen);
   
     stick_x = center_x + (double)gamepad.LX / 2048 * radius;
     stick_y = center_y - (double)gamepad.LY / 2048 * radius;
 	gdc.DrawCircle(stick_x, stick_y, radius);
-
-    // 押し込み
-    if (gamepad.L3) {
-        gdc.SetPen(redPen);
-        gdc.DrawCircle(stick_x, stick_y, radius);
-    }
 
 
     // Rスティック
@@ -136,17 +131,12 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 	// スティック
 	radius = 18;
 	gdc.SetBrush(*wxBLACK);
+	gdc.SetPen(gamepad.R3 ? redPen : yellowPen);
 
 	stick_x = center_x + (double)gamepad.RX / 2048 * radius;
 	stick_y = center_y - (double)gamepad.RY / 2048 * radius;
 
 	gdc.DrawCircle(stick_x, stick_y, radius);
-
-	// 押し込み
-	if (gamepad.R3) {
-		gdc.SetPen(redPen);
-		gdc.DrawCircle(stick_x, stick_y, radius);
-	}
 
 
     // 十字キー
@@ -225,7 +215,7 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 	}
 
 
-    // -, +
+    // PLUS, MINUS
 	gdc.SetPen(whitePenS);
 	gdc.SetBrush(*wxTRANSPARENT_BRUSH);
     radius = 10;
@@ -233,17 +223,11 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
     center_y = 90;
     offset = 36;
 
-	gdc.DrawCircle(center_x + offset, center_y, radius); // +
-	gdc.DrawCircle(center_x - offset, center_y, radius); // -
+	gdc.SetBrush(gamepad.PLUS ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+	gdc.DrawCircle(center_x + offset, center_y, radius);
 
-	if (gamepad.PLUS) {
-		gdc.SetBrush(*wxWHITE);
-		gdc.DrawCircle(center_x + offset, center_y, radius);
-	}
-	if (gamepad.MINUS) {
-		gdc.SetBrush(*wxWHITE);
-		gdc.DrawCircle(center_x - offset, center_y, radius);
-	}
+	gdc.SetBrush(gamepad.MINUS ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+	gdc.DrawCircle(center_x - offset, center_y, radius);
 
 	// Capture, Home
     // 見た目が悪いので実装しない
@@ -251,40 +235,24 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 
 	// A, B, X, Yボタン
     gdc.SetPen(whitePen);
-    gdc.SetBrush(*wxTRANSPARENT_BRUSH);
 
     radius = 12;
     center_x = 240;
     center_y = 120;
     offset = 25;
-  
-    // 押されてない
-    gdc.DrawCircle(center_x + offset, center_y, radius); // A
-	gdc.DrawCircle(center_x, center_y + offset, radius); // B
-	gdc.DrawCircle(center_x, center_y - offset, radius); // X
-	gdc.DrawCircle(center_x - offset, center_y, radius); // Y
 
-	// 押されてる
-    if (gamepad.A) {
-        gdc.SetBrush(*wxWHITE);
-        gdc.DrawCircle(center_x + offset, center_y, radius);
-    }
-    if (gamepad.B) {
-        gdc.SetBrush(*wxWHITE);
-        gdc.DrawCircle(center_x, center_y + offset, radius);
-    }
-    if (gamepad.X) {
-        gdc.SetBrush(*wxWHITE);
-        gdc.DrawCircle(center_x, center_y - offset, radius);
-    }
-    if (gamepad.Y) {
-        gdc.SetBrush(*wxWHITE);
-        gdc.DrawCircle(center_x - offset, center_y, radius);
-    }
+	gdc.SetBrush(gamepad.A ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+    gdc.DrawCircle(center_x + offset, center_y, radius);
 
+	gdc.SetBrush(gamepad.B ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+	gdc.DrawCircle(center_x, center_y + offset, radius);
 
+	gdc.SetBrush(gamepad.X ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+	gdc.DrawCircle(center_x, center_y - offset, radius);
 
-   
+	gdc.SetBrush(gamepad.Y ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+	gdc.DrawCircle(center_x - offset, center_y, radius);
+
 
     // 正八角形
     wxPen anyColorPen(wxColour(255, 100, 100), 2);
