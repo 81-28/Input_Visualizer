@@ -272,20 +272,30 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 
 	// L, Rボタン
 	gdc.SetPen(whitePen);
-	radius = 10;
 	center_x = 150;
-	center_y = 45;
+	center_y = 60;
 	offset = 20;
 	short w = 60;
 	short h = 16;
 
-
 	gdc.SetBrush(gamepad.L ? *wxWHITE : *wxTRANSPARENT_BRUSH);
-	gdc.DrawRoundedRectangle(center_x - offset - w, center_y + h / 2, w, h, 6);
+	gdc.DrawRoundedRectangle(center_x - offset - w, center_y - h / 2, w, h, 6);
 
 	gdc.SetBrush(gamepad.R ? *wxWHITE : *wxTRANSPARENT_BRUSH);
-	gdc.DrawRoundedRectangle(center_x + offset, center_y + h / 2, w, h, 6);
+	gdc.DrawRoundedRectangle(center_x + offset, center_y - h / 2, w, h, 6);
 
+	// ZL, ZRボタン
+	gdc.SetPen(whitePen);
+	center_x = 150;
+	center_y = 20;
+	offset = 20;
+	w = 80;
+	h = 30;
+
+	gdc.SetBrush(gamepad.ZL ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+	gdc.DrawRoundedRectangle(center_x - offset - w, center_y - h / 2 + 10, w, h, 6);
+	gdc.SetBrush(gamepad.ZR ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+	gdc.DrawRoundedRectangle(center_x + offset, center_y - h / 2 + 10, w, h, 6);
 
 
     // 正八角形
