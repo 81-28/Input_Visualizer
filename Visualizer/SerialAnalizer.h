@@ -97,9 +97,11 @@ public:
 	~SerialAnalizer();
 
 	SwitchPro::GamePad GetGamePad();
+	bool IsOpen() const { return port.is_open(); }
 
 private:
 	bool OpenSerialPort(std::string portName);
+    bool ReadOnce(int timeout_ms);
     void CalcNeutral();
 	void ReadLoop();
 
@@ -117,6 +119,6 @@ private:
 	bool running = true;
 
 	std::mutex mtx;
-    SwitchPro::GamePad gamepad;
+    SwitchPro::GamePad gamepad = {};
 };
 

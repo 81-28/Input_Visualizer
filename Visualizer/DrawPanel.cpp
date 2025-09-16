@@ -79,6 +79,13 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 	wxPen whitePen (*wxWHITE,  3, wxPENSTYLE_SOLID);
 	wxPen whitePenS(*wxWHITE,  2, wxPENSTYLE_SOLID);
 
+	MainFrame* frame = dynamic_cast<MainFrame*>(GetParent());
+	if (!frame || !frame->m_serial || !frame->m_serial->IsOpen()) {
+		// シリアルポートが開かれていない場合は描画しない
+		return;
+	}
+
+	// GamePad情報取得
     SwitchPro::GamePad gamepad = dynamic_cast<MainFrame*>(GetParent())->m_serial->GetGamePad();
 
     short radius;
