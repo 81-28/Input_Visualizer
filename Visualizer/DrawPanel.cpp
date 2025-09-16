@@ -28,9 +28,9 @@ std::vector<wxPoint> CreateHomeBase(int cx, int cy, int size, double angle) {
 
     double base[5][2];
 	if (angle == 0 || angle == M_PI) {
-        base[0][0] = 0, base[0][1] = 0; // 先端
-		base[1][0] = 1, base[1][1] = 1; // 右上
-		base[2][0] = 1, base[2][1] = 3; // 右下
+        base[0][0] =  0, base[0][1] = 0; // 先端
+		base[1][0] =  1, base[1][1] = 1; // 右上
+		base[2][0] =  1, base[2][1] = 3; // 右下
 		base[3][0] = -1, base[3][1] = 3; // 左下
 		base[4][0] = -1, base[4][1] = 1; // 左上
 
@@ -43,9 +43,9 @@ std::vector<wxPoint> CreateHomeBase(int cx, int cy, int size, double angle) {
     }
 
     if (angle == M_PI / 2 || angle == 3 * M_PI / 2) {
-        base[0][0] = 0, base[0][1] = 0; // 先端
-        base[1][0] = -1, base[1][1] = 1; // 右上
-        base[2][0] = -3, base[2][1] = 1; // 右下
+        base[0][0] =  0, base[0][1] =  0; // 先端
+        base[1][0] = -1, base[1][1] =  1; // 右上
+        base[2][0] = -3, base[2][1] =  1; // 右下
         base[3][0] = -3, base[3][1] = -1; // 左下
         base[4][0] = -1, base[4][1] = -1; // 左上
 
@@ -228,6 +228,7 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 
 	gdc.SetBrush(gamepad.MINUS ? *wxWHITE : *wxTRANSPARENT_BRUSH);
 	gdc.DrawCircle(center_x - offset, center_y, radius);
+
 
 	// Capture, Home
     // 見た目が悪いので実装しない
