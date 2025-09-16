@@ -87,6 +87,9 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
     short offset;
     double stick_x, stick_y;
 
+	// LRスティック
+	double deadzone = 0.05;
+
 	// Lスティック
     gdc.SetPen(whitePen);
 	gdc.SetBrush(*wxTRANSPARENT_BRUSH);
@@ -110,6 +113,13 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
   
     stick_x = center_x + (double)gamepad.LX / 2048 * radius;
     stick_y = center_y - (double)gamepad.LY / 2048 * radius;
+
+	// デッドゾーン
+	if (hypot((double)gamepad.LX / 2048, (double)gamepad.LY / 2048) < deadzone) {
+		stick_x = center_x;
+		stick_y = center_y;
+	}
+
 	gdc.DrawCircle(stick_x, stick_y, radius);
 
 
@@ -135,6 +145,12 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 
 	stick_x = center_x + (double)gamepad.RX / 2048 * radius;
 	stick_y = center_y - (double)gamepad.RY / 2048 * radius;
+
+	// デッドゾーン
+	if (hypot((double)gamepad.RX / 2048, (double)gamepad.RY / 2048) < deadzone) {
+		stick_x = center_x;
+		stick_y = center_y;
+	}
 
 	gdc.DrawCircle(stick_x, stick_y, radius);
 
@@ -254,16 +270,27 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 	gdc.SetBrush(gamepad.Y ? *wxWHITE : *wxTRANSPARENT_BRUSH);
 	gdc.DrawCircle(center_x - offset, center_y, radius);
 
+	// L, Rボタン
+	gdc.SetPen(whitePen);
+	radius = 10;
+	center_x = 150;
+	center_y = 45;
+	offset = 20;
+	short w = 60;
+	short h = 16;
+
+
+	gdc.SetBrush(gamepad.L ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+	gdc.DrawRoundedRectangle(center_x - offset - w, center_y + h / 2, w, h, 6);
+
+	gdc.SetBrush(gamepad.R ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+	gdc.DrawRoundedRectangle(center_x + offset, center_y + h / 2, w, h, 6);
+
+
 
     // 正八角形
     wxPen anyColorPen(wxColour(255, 100, 100), 2);
     gdc.SetPen(anyColorPen);
-
-
-
-    // 内部を塗りつぶし
-    gdc.SetBrush(wxBrush(*wxWHITE));
-    gdc.DrawCircle(500, 100, 30);
 
 	//std::cout << (double)gamepad.LX / 2048 << ", " << (double)gamepad.LY / 2048 << " | " << std::endl;
 }
