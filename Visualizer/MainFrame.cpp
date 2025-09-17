@@ -40,16 +40,32 @@ void MainFrame::OnConnect(wxCommandEvent& event) {
 			wxMessageBox("Please select a COM port.", "Error", wxOK | wxICON_ERROR);
 			return;
 		}
+
 		wxString portStr = m_comChoice->GetString(sel);
 		portStr = portStr.BeforeFirst('('); // Extract port name before '('
-		try {
-			std::cout << portStr.mb_str() << std::endl;
-			m_serial = new SerialAnalizer(std::string(portStr.mb_str()));
+
+		if (TryOpenPort(std::string(portStr.mb_str()))) {
 			m_connectButton->SetLabel("Disconnect");
 		}
-		catch (const std::exception& e) {
-			wxMessageBox(wxString::Format("Failed to open serial port: %s", e.what()), "Error", wxOK | wxICON_ERROR);
-			m_serial = nullptr;
+		else {
+			wxMessageBox("Wrong port or device not connected", "Error", wxOK | wxICON_ERROR);
 		}
 	}
+}
+
+bool MainFrame::TryOpenPort(const std::string& portName) {
+	try {
+		m_serial = new SerialAnalizer(portName);
+		
+		if (!m_serial->ReadOnce(200)) {
+			delete m_serial;
+			m_serial = nullptr;
+			return false;
+		}
+		return true;
+	}
+	catch (const std::exception& e) {
+		m_serial = nullptr;
+		return false;
+	}	
 }

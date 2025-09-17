@@ -98,10 +98,10 @@ public:
 
 	SwitchPro::GamePad GetGamePad();
 	bool IsOpen() const { return port.is_open(); }
+    bool ReadOnce(int timeout_ms);
 
 private:
 	bool OpenSerialPort(std::string portName);
-    bool ReadOnce(int timeout_ms);
     void CalcNeutral();
 	void ReadLoop();
 

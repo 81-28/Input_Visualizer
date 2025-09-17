@@ -1,7 +1,9 @@
 ﻿#include "SerialAnalizer.h"
+#include "MainFrame.h"
 #include <iostream>
 #include <vector>
 #include <iomanip>
+
 
 
 SerialAnalizer::SerialAnalizer(const std::string portName) : port(io) {
@@ -43,37 +45,29 @@ bool SerialAnalizer::ReadOnce(int timeout_ms) {
 	bool timed_out = false;
 	bool read_ok = false;
 
-	// 1. タイマーを設定
+	// タイマーを設定
 	asio::steady_timer timer(io);
 	timer.expires_after(std::chrono::milliseconds(timeout_ms));
 	timer.async_wait([&](const asio::error_code& ec) {
-		if (!ec) { // 正常にタイマー発火
+		if (!ec) { // タイムアウト
 			timed_out = true;
 			port.cancel();
 		}
 	});
 
-	// 2. 非同期読み込みを開始
+	// 非同期読み込み開始
 	asio::async_read(port, asio::buffer(&buf, 1),
 		[&](const asio::error_code& ec, std::size_t /*length*/) {
-			if (!ec) {
-				read_ok = true;
-			}
+			if (!ec) read_ok = true;
 		});
 
-	// 3. io_context を実行
+	// io_context を実行
 	io.restart();
 	while (io.run_one()) {
-		if (read_ok) {
-			// 読み込み成功 → タイマーキャンセル
-			timer.cancel();
-		}
-		else if (timed_out) {
-			// タイムアウト → 読み込みキャンセル済み
-		}
+		// 読み込み成功したらタイマーキャンセル
+		if (read_ok) timer.cancel();
 	}
 
-	// 4. 結果を返す
 	return read_ok && !timed_out;
 }
 

@@ -79,6 +79,8 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 	wxPen whitePen (*wxWHITE,  3, wxPENSTYLE_SOLID);
 	wxPen whitePenS(*wxWHITE,  2, wxPENSTYLE_SOLID);
 
+	//wxPen anyColorPen(wxColour(R, G, B), width);
+
 	MainFrame* frame = dynamic_cast<MainFrame*>(GetParent());
 	if (!frame || !frame->m_serial || !frame->m_serial->IsOpen()) {
 		// シリアルポートが開かれていない場合は描画しない
@@ -303,13 +305,6 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 	gdc.DrawRoundedRectangle(center_x - offset - w, center_y - h / 2 + 10, w, h, 6);
 	gdc.SetBrush(gamepad.ZR ? *wxWHITE : *wxTRANSPARENT_BRUSH);
 	gdc.DrawRoundedRectangle(center_x + offset, center_y - h / 2 + 10, w, h, 6);
-
-
-    // 正八角形
-    wxPen anyColorPen(wxColour(255, 100, 100), 2);
-    gdc.SetPen(anyColorPen);
-
-	//std::cout << (double)gamepad.LX / 2048 << ", " << (double)gamepad.LY / 2048 << " | " << std::endl;
 }
 
 void DrawPanel::OnTimer(wxTimerEvent& event) {
