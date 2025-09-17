@@ -1,6 +1,7 @@
 ﻿#include "MainFrame.h"
 #include "SerialUtils.h"
 
+
 MainFrame::MainFrame(const wxString& title) : wxFrame(NULL, wxID_ANY, title) {
 	m_drawPanel = new DrawPanel(this);
 	

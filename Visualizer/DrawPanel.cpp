@@ -4,6 +4,7 @@
 #include <iostream>
 #include "MainFrame.h"
 
+
 wxBEGIN_EVENT_TABLE(DrawPanel, wxPanel)
 EVT_PAINT(DrawPanel::OnPaint)
 EVT_TIMER(wxID_ANY, DrawPanel::OnTimer)

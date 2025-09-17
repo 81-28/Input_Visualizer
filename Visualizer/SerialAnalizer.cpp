@@ -5,7 +5,6 @@
 #include <iomanip>
 
 
-
 SerialAnalizer::SerialAnalizer(const std::string portName) : port(io) {
 	if (!OpenSerialPort(portName)) {
 		throw std::runtime_error("Failed to open serial port");
@@ -148,8 +147,6 @@ void SerialAnalizer::CalcNeutral() {
 }
 
 void SerialAnalizer::ReadLoop() {
-
-
 	while (running) {
 		try {
 			uint8_t current_byte;

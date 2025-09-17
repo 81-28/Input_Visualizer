@@ -4,6 +4,7 @@
 #include <devguid.h>
 #include <RegStr.h>
 
+
 std::vector<SerialUtils::SerialPortInfo> SerialUtils::AvailablePorts() {
 	std::vector<SerialPortInfo> ports;
 

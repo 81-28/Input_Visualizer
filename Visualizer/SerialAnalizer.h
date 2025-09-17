@@ -3,6 +3,7 @@
 #include <string>
 #include <thread>
 
+
 namespace SwitchPro
 {
     static constexpr uint8_t INFO_CONN_MASK = 0xAB;
@@ -88,7 +89,6 @@ namespace SwitchPro
 		int16_t RY;
     };
 };
-
 
 class SerialAnalizer
 {
