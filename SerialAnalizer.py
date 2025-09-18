@@ -79,6 +79,20 @@ def main():
                     if button_bits & (1 << i):
                         name = button_names[i] if i < len(button_names) else f"Button {i}"
                         print(f"{name} is pressed.")
+                # 左スティックの解析
+                l_stick_byte = payload[6:9]
+                print_hex(l_stick_byte)
+                l_stick_val = int.from_bytes(l_stick_byte, 'big')
+                l_stick_x = (l_stick_val >> 12) & 0xFFF
+                l_stick_y = l_stick_val & 0xFFF
+                print(f"Left Stick: X={l_stick_x}, Y={l_stick_y}")
+                # 右スティックの解析
+                r_stick_byte = payload[9:12]
+                print_hex(r_stick_byte)
+                r_stick_val = int.from_bytes(r_stick_byte, 'big')
+                r_stick_x = (r_stick_val >> 12) & 0xFFF
+                r_stick_y = r_stick_val & 0xFFF
+                print(f"Right Stick: X={r_stick_x}, Y={r_stick_y}")
             else:
                 print("Error: Frame end byte mismatch.")
 
