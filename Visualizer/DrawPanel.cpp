@@ -121,14 +121,17 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 	gdc.SetBrush(*wxBLACK);
 	gdc.SetPen(gamepad.L3 ? redPen : whitePen);
   
-    stick_x = center_x + (double)gamepad.LX / 2048 * radius;
-    stick_y = center_y - (double)gamepad.LY / 2048 * radius;
+    stick_x = (double)gamepad.LX / 2048;
+    stick_y = (double)gamepad.LY / 2048;
 
 	// デッドゾーン
-	if (hypot((double)gamepad.LX / 2048, (double)gamepad.LY / 2048) < deadzone) {
-		stick_x = center_x;
-		stick_y = center_y;
+	if (hypot(stick_x, stick_y) < deadzone) {
+		stick_x = 0;
+		stick_y = 0;
 	}
+
+	stick_x = center_x + stick_x * radius;
+	stick_y = center_y - stick_y * radius;
 
 	gdc.DrawCircle(stick_x, stick_y, radius);
 
@@ -153,14 +156,17 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 	gdc.SetBrush(*wxBLACK);
 	gdc.SetPen(gamepad.R3 ? redPen : yellowPen);
 
-	stick_x = center_x + (double)gamepad.RX / 2048 * radius;
-	stick_y = center_y - (double)gamepad.RY / 2048 * radius;
+	stick_x = (double)gamepad.RX / 2048;
+	stick_y = (double)gamepad.RY / 2048;
 
 	// デッドゾーン
-	if (hypot((double)gamepad.RX / 2048, (double)gamepad.RY / 2048) < deadzone) {
-		stick_x = center_x;
-		stick_y = center_y;
+	if (hypot(stick_x, stick_y) < deadzone) {
+		stick_x = 0;
+		stick_y = 0;
 	}
+
+	stick_x = center_x + stick_x * radius;
+	stick_y = center_y - stick_y * radius;
 
 	gdc.DrawCircle(stick_x, stick_y, radius);
 
@@ -178,7 +184,7 @@ void DrawPanel::OnPaint(wxPaintEvent& event) {
 		short cx = center_x;
 		short cy = center_y;
         short core = 2 * size;
-		short arm = 2 * size;
+		short arm  = 2 * size;
 
         std::vector<wxPoint> pts;
         // 上
