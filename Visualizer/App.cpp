@@ -1,7 +1,7 @@
 ﻿#include "App.h"
 #include "MainFrame.h"
 
-#define DEBUG
+//#define DEBUG
 
 wxIMPLEMENT_APP(App);
 
@@ -17,7 +17,7 @@ bool App::OnInit() {
 	}
 #endif
 
-	MainFrame* mainFrame = new MainFrame("draw shapes");
+	MainFrame* mainFrame = new MainFrame("GamePad");
 	mainFrame->SetSize(310, 280);
 	mainFrame->Centre();
 	mainFrame->Show(true);
