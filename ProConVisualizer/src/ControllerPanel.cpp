@@ -1,4 +1,4 @@
-#include "ControllerPanel.h"
+#include "../include/ControllerPanel.h"
 #include <wx/graphics.h>
 #include <iostream>
 

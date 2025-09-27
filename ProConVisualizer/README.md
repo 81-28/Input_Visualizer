@@ -1,46 +1,69 @@
 # Pro Controller Visualizer
 
-このアプリケーションは、RP2350マイコンから送信されるNintendo Switch Pro Controllerの入力データを視覚化します。
+RP2350マイコンから送信されるNintendo Switch Pro Controllerの入力データをリアルタイムで表示するアプリケーションです。
 
 ## 機能
 
-- プロコンのボタン状態をリアルタイム表示
-- 左右スティックの位置表示
-- D-Padの状態表示
-- シリアル通信によるデータ受信（COBS プロトコル対応）
-- CRC8によるデータ整合性チェック
+- 🎮 プロコンのボタン状態をリアルタイム表示
+- 🕹️ 左右アナログスティックの位置表示
+- ➕ D-Padの状態表示  
+- 📡 シリアル通信（COBS + CRC8）による安定したデータ受信
+- 🖥️ 既存のVisualizerと統一されたUI デザイン
 
-## 必要な環境
+## システム要件
 
 - Windows 10/11
-- wxWidgets 3.1以上
-- CMake 3.16以上
-- Visual Studio 2019以上 または MinGW
+- wxWidgets 3.3.1
+- Visual Studio 2019/2022
 
-## ビルド方法
+## セットアップ
 
-1. wxWidgetsをインストール
-2. CMakeでプロジェクトを生成
-```bash
-mkdir build
-cd build
-cmake ..
-cmake --build . --config Release
-```
+1. **wxWidgets のインストール**
+   - `C:\wxWidgets-3.3.1` または `C:\wxWidgets` にインストール
+
+2. **プロジェクトのビルド**
+   ```batch
+   build.bat
+   ```
+
+3. **実行**
+   ```batch
+   x64\Release\ProConVisualizer.exe
+   ```
 
 ## 使用方法
 
-1. RP2350マイコンをPCに接続
-2. アプリを起動
-3. COMポートを選択して「接続」をクリック
-4. プロコンを操作すると、リアルタイムで入力が表示されます
+1. RP2350デバイスをUSBで接続
+2. アプリケーションを起動
+3. COMポートを選択して「Connect」
+4. プロコンの入力がリアルタイムで表示されます
 
-## データ形式
+## プロジェクト構成
 
-RP2350から送信されるデータは以下の構造です：
-- ボタン状態: 16bit
-- D-Pad状態: 8bit  
-- スティック値: 各軸8bit (左X, 左Y, 右X, 右Y)
-- CRC: 8bit
+```
+ProConVisualizer/
+├── src/                 # ソースファイル
+│   ├── ProConVisualizer.cpp
+│   ├── ControllerPanel.cpp
+│   └── SerialUtils.cpp
+├── include/             # ヘッダーファイル
+│   ├── ControllerPanel.h
+│   └── SerialUtils.h
+├── build.bat            # ビルドスクリプト
+└── x64/Release/         # 実行ファイル
+```
 
-データはCOBS (Consistent Overhead Byte Stuffing) プロトコルでエンコードされています。
+## 対応コントローラー入力
+
+- A/B/X/Y ボタン
+- L/R, ZL/ZR ボタン  
+- PLUS/MINUS ボタン
+- 左右スティック（押し込み含む）
+- D-Pad（上下左右）
+
+## 技術詳細
+
+- **通信プロトコル**: COBS (Consistent Overhead Byte Stuffing)
+- **データ整合性**: CRC8チェックサム
+- **フレームレート**: 60FPS
+- **グラフィック**: wxGraphicsContext による高品質描画

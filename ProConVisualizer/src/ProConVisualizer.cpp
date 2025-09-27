@@ -2,8 +2,8 @@
 #include <wx/choice.h>
 #include <wx/sizer.h>
 #include <iostream>
-#include "ControllerPanel.h"
-#include "SerialUtils.h"
+#include "../include/ControllerPanel.h"
+#include "../include/SerialUtils.h"
 
 #ifdef _WIN32
 #include <windows.h>
