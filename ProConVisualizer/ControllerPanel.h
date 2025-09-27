@@ -59,7 +59,7 @@ private:
     void DrawController(wxGraphicsContext* gc);
     void DrawButton(wxGraphicsContext* gc, double x, double y, double radius, bool pressed, const wxString& label);
     void DrawStick(wxGraphicsContext* gc, double cx, double cy, double radius, uint8_t x_val, uint8_t y_val);
-    void DrawDPad(wxGraphicsContext* gc, double cx, double cy, double size, uint8_t dpad_state);
+    void DrawDPad(wxGraphicsContext* gc, double cx, double cy, double size);
     
     wxTimer m_timer;
     

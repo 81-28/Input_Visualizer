@@ -257,10 +257,6 @@ void ControllerPanel::OnSize(wxSizeEvent& event)
 
 void ControllerPanel::DrawController(wxGraphicsContext* gc)
 {
-    wxSize size = GetSize();
-    double centerX = size.x / 2.0;
-    double centerY = size.y / 2.0;
-    
     std::lock_guard<std::mutex> lock(dataMutex);
     
     if (!dataValid) {
@@ -271,46 +267,166 @@ void ControllerPanel::DrawController(wxGraphicsContext* gc)
         wxString status = connected ? "Waiting for data..." : "Not connected";
         double textWidth, textHeight;
         gc->GetTextExtent(status, &textWidth, &textHeight);
-        gc->DrawText(status, centerX - textWidth/2, centerY - textHeight/2);
+        gc->DrawText(status, 150, 100);
         return;
     }
     
-    // 左スティック
-    DrawStick(gc, centerX - 120, centerY + 40, 30, controllerData.stick_lx, controllerData.stick_ly);
+    // ペン定義（Visualizerと同じ）
+    wxPen redPen(*wxRED, 3, wxPENSTYLE_SOLID);
+    wxPen yellowPen(*wxYELLOW, 3, wxPENSTYLE_SOLID);
+    wxPen whitePen(*wxWHITE, 3, wxPENSTYLE_SOLID);
+    wxPen whitePenS(*wxWHITE, 2, wxPENSTYLE_SOLID);
     
-    // 右スティック  
-    DrawStick(gc, centerX + 120, centerY + 40, 30, controllerData.stick_rx, controllerData.stick_ry);
+    double deadzone = 0.05;
     
-    // D-Pad
-    DrawDPad(gc, centerX - 80, centerY - 20, 25, controllerData.dpad);
+    // Lスティック（八角形 + 円形）
+    gc->SetPen(wxPen(*wxWHITE, 3));
+    gc->SetBrush(*wxTRANSPARENT_BRUSH);
     
-    // 右側ボタン (A, B, X, Y)
-    DrawButton(gc, centerX + 80, centerY - 20, 15, controllerData.buttons & BTN_A, "A");
-    DrawButton(gc, centerX + 80 + 25, centerY - 20 - 25, 15, controllerData.buttons & BTN_X, "X");
-    DrawButton(gc, centerX + 80 - 25, centerY - 20 - 25, 15, controllerData.buttons & BTN_Y, "Y");
-    DrawButton(gc, centerX + 80, centerY - 20 - 50, 15, controllerData.buttons & BTN_B, "B");
+    // 八角形(外枠)
+    int center_x = 50;
+    int center_y = 115;
+    int radius = 35;
     
-    // 肩ボタン
-    DrawButton(gc, centerX - 100, centerY - 80, 12, controllerData.buttons & BTN_L, "L");
-    DrawButton(gc, centerX + 100, centerY - 80, 12, controllerData.buttons & BTN_R, "R");
-    DrawButton(gc, centerX - 120, centerY - 80, 12, controllerData.buttons & BTN_ZL, "ZL");
-    DrawButton(gc, centerX + 120, centerY - 80, 12, controllerData.buttons & BTN_ZR, "ZR");
-    
-    // 中央ボタン
-    DrawButton(gc, centerX - 30, centerY - 50, 10, controllerData.buttons & BTN_MINUS, "-");
-    DrawButton(gc, centerX + 30, centerY - 50, 10, controllerData.buttons & BTN_PLUS, "+");
-    DrawButton(gc, centerX, centerY - 50, 10, controllerData.buttons & BTN_HOME, "H");
-    DrawButton(gc, centerX, centerY - 30, 8, controllerData.buttons & BTN_CAPTURE, "C");
-    
-    // スティッククリック
-    if (controllerData.buttons & BTN_L_STICK) {
-        gc->SetBrush(wxBrush(wxColour(255, 0, 0, 100)));
-        gc->DrawEllipse(centerX - 150, centerY + 10, 60, 60);
+    wxPoint2DDouble points[8];
+    for (int i = 0; i < 8; ++i) {
+        double angle = i * (2 * M_PI / 8);
+        points[i].m_x = center_x + radius * cos(angle);
+        points[i].m_y = center_y + radius * sin(angle);
     }
-    if (controllerData.buttons & BTN_R_STICK) {
-        gc->SetBrush(wxBrush(wxColour(255, 0, 0, 100)));
-        gc->DrawEllipse(centerX + 90, centerY + 10, 60, 60);
+    // 八角形を描画（パスを使用）
+    wxGraphicsPath octPath = gc->CreatePath();
+    octPath.MoveToPoint(points[0]);
+    for (int i = 1; i < 8; ++i) {
+        octPath.AddLineToPoint(points[i]);
     }
+    octPath.CloseSubpath();
+    gc->DrawPath(octPath);
+    
+    // Lスティック
+    radius = 20;
+    gc->SetBrush(*wxBLACK);
+    gc->SetPen(wxPen(controllerData.buttons & BTN_L_STICK ? *wxRED : *wxWHITE, 3));
+    
+    double stick_x = (double)(controllerData.stick_lx - 128) / 128.0;
+    double stick_y = (double)(controllerData.stick_ly - 128) / 128.0;
+    
+    // デッドゾーン
+    if (hypot(stick_x, stick_y) < deadzone) {
+        stick_x = 0;
+        stick_y = 0;
+    }
+    
+    stick_x = center_x + stick_x * radius;
+    stick_y = center_y - stick_y * radius;
+    
+    gc->DrawEllipse(stick_x - radius, stick_y - radius, radius * 2, radius * 2);
+    
+    // Rスティック（八角形 + 円形）
+    gc->SetPen(wxPen(*wxYELLOW, 3));
+    gc->SetBrush(*wxTRANSPARENT_BRUSH);
+    
+    // 八角形(外枠)
+    center_x = 190;
+    center_y = 170;
+    radius = 32; // 少し小さめ
+    
+    for (int i = 0; i < 8; ++i) {
+        double angle = i * (2 * M_PI / 8);
+        points[i].m_x = center_x + radius * cos(angle);
+        points[i].m_y = center_y + radius * sin(angle);
+    }
+    // 八角形を描画（パスを使用）
+    octPath = gc->CreatePath();
+    octPath.MoveToPoint(points[0]);
+    for (int i = 1; i < 8; ++i) {
+        octPath.AddLineToPoint(points[i]);
+    }
+    octPath.CloseSubpath();
+    gc->DrawPath(octPath);
+    
+    // Rスティック
+    radius = 18;
+    gc->SetBrush(*wxBLACK);
+    gc->SetPen(wxPen(controllerData.buttons & BTN_R_STICK ? *wxRED : *wxYELLOW, 3));
+    
+    stick_x = (double)(controllerData.stick_rx - 128) / 128.0;
+    stick_y = (double)(controllerData.stick_ry - 128) / 128.0;
+    
+    // デッドゾーン
+    if (hypot(stick_x, stick_y) < deadzone) {
+        stick_x = 0;
+        stick_y = 0;
+    }
+    
+    stick_x = center_x + stick_x * radius;
+    stick_y = center_y - stick_y * radius;
+    
+    gc->DrawEllipse(stick_x - radius, stick_y - radius, radius * 2, radius * 2);
+    
+    // 十字キー
+    DrawDPad(gc, 110, 170, 10);
+    
+    // PLUS, MINUS
+    gc->SetPen(wxPen(*wxWHITE, 2));
+    gc->SetBrush(*wxTRANSPARENT_BRUSH);
+    radius = 10;
+    center_x = 150;
+    center_y = 90;
+    int offset = 36;
+    
+    gc->SetBrush(controllerData.buttons & BTN_PLUS ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+    gc->DrawEllipse(center_x + offset - radius, center_y - radius, radius * 2, radius * 2);
+    
+    gc->SetBrush(controllerData.buttons & BTN_MINUS ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+    gc->DrawEllipse(center_x - offset - radius, center_y - radius, radius * 2, radius * 2);
+    
+    // A, B, X, Yボタン
+    gc->SetPen(wxPen(*wxWHITE, 3));
+    
+    radius = 12;
+    center_x = 240;
+    center_y = 120;
+    offset = 25;
+    
+    gc->SetBrush(controllerData.buttons & BTN_A ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+    gc->DrawEllipse(center_x + offset - radius, center_y - radius, radius * 2, radius * 2);
+    
+    gc->SetBrush(controllerData.buttons & BTN_B ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+    gc->DrawEllipse(center_x - radius, center_y + offset - radius, radius * 2, radius * 2);
+    
+    gc->SetBrush(controllerData.buttons & BTN_X ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+    gc->DrawEllipse(center_x - radius, center_y - offset - radius, radius * 2, radius * 2);
+    
+    gc->SetBrush(controllerData.buttons & BTN_Y ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+    gc->DrawEllipse(center_x - offset - radius, center_y - radius, radius * 2, radius * 2);
+    
+    // L, Rボタン
+    gc->SetPen(wxPen(*wxWHITE, 3));
+    center_x = 150;
+    center_y = 60;
+    offset = 20;
+    int w = 60;
+    int h = 16;
+    
+    gc->SetBrush(controllerData.buttons & BTN_L ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+    gc->DrawRoundedRectangle(center_x - offset - w, center_y - h / 2, w, h, 6);
+    
+    gc->SetBrush(controllerData.buttons & BTN_R ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+    gc->DrawRoundedRectangle(center_x + offset, center_y - h / 2, w, h, 6);
+    
+    // ZL, ZRボタン
+    gc->SetPen(wxPen(*wxWHITE, 3));
+    center_x = 150;
+    center_y = 20;
+    offset = 20;
+    w = 80;
+    h = 30;
+    
+    gc->SetBrush(controllerData.buttons & BTN_ZL ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+    gc->DrawRoundedRectangle(center_x - offset - w, center_y - h / 2 + 10, w, h, 6);
+    gc->SetBrush(controllerData.buttons & BTN_ZR ? *wxWHITE : *wxTRANSPARENT_BRUSH);
+    gc->DrawRoundedRectangle(center_x + offset, center_y - h / 2 + 10, w, h, 6);
 }
 
 void ControllerPanel::DrawButton(wxGraphicsContext* gc, double x, double y, double radius, bool pressed, const wxString& label)
@@ -356,48 +472,147 @@ void ControllerPanel::DrawStick(wxGraphicsContext* gc, double cx, double cy, dou
     gc->DrawEllipse(stickX - 5, stickY - 5, 10, 10);
 }
 
-void ControllerPanel::DrawDPad(wxGraphicsContext* gc, double cx, double cy, double size, uint8_t dpad_state)
+std::vector<wxPoint2DDouble> CreateHomeBase(int cx, int cy, int size, double angle) {
+    std::vector<wxPoint2DDouble> points(5);
+
+    double base[5][2];
+    if (angle == 0 || angle == M_PI) {
+        base[0][0] =  0, base[0][1] = 0; // 先端
+        base[1][0] =  1, base[1][1] = 1; // 右上
+        base[2][0] =  1, base[2][1] = 3; // 右下
+        base[3][0] = -1, base[3][1] = 3; // 左下
+        base[4][0] = -1, base[4][1] = 1; // 左上
+
+        if (angle == M_PI) {
+            for (int i = 0; i < 5; ++i) {
+                base[i][0] = -base[i][0];
+                base[i][1] = -base[i][1];
+            }
+        }
+    }
+
+    if (angle == M_PI / 2 || angle == 3 * M_PI / 2) {
+        base[0][0] =  0, base[0][1] =  0; // 先端
+        base[1][0] = -1, base[1][1] =  1; // 右上
+        base[2][0] = -3, base[2][1] =  1; // 右下
+        base[3][0] = -3, base[3][1] = -1; // 左下
+        base[4][0] = -1, base[4][1] = -1; // 左上
+
+        if (angle == 3 * M_PI / 2) {
+            for (int i = 0; i < 5; ++i) {
+                base[i][0] = -base[i][0];
+                base[i][1] = -base[i][1];
+            }
+        }
+    }
+
+    for (int i = 0; i < 5; ++i) {
+        double ix = base[i][0] * size;
+        double iy = base[i][1] * size;
+        points[i].m_x = cx + ix;
+        points[i].m_y = cy + iy;
+    }
+    return points;
+}
+
+void ControllerPanel::DrawDPad(wxGraphicsContext* gc, double cx, double cy, double size)
 {
-    double halfSize = size / 2;
+    // 十字キー
+    gc->SetPen(wxPen(*wxWHITE, 2));
+    gc->SetBrush(*wxTRANSPARENT_BRUSH);
     
+    int center_x = (int)cx;
+    int center_y = (int)cy;
+    int isize = (int)size;
+    
+    // 十字キーの座標計算
+    short core = 2 * isize;
+    short arm  = 2 * isize;
+
+    std::vector<wxPoint2DDouble> pts;
     // 上
-    wxColour upColor = (dpad_state & DPAD_UP) ? wxColour(255, 100, 100) : wxColour(100, 100, 100);
-    gc->SetBrush(wxBrush(upColor));
-    gc->SetPen(wxPen(wxColour(200, 200, 200), 1));
-    wxGraphicsPath path = gc->CreatePath();
-    path.MoveToPoint(cx, cy - size);
-    path.AddLineToPoint(cx - halfSize/2, cy - halfSize);
-    path.AddLineToPoint(cx + halfSize/2, cy - halfSize);
-    path.CloseSubpath();
-    gc->FillPath(path);
-    
-    // 下
-    wxColour downColor = (dpad_state & DPAD_DOWN) ? wxColour(255, 100, 100) : wxColour(100, 100, 100);
-    gc->SetBrush(wxBrush(downColor));
-    path = gc->CreatePath();
-    path.MoveToPoint(cx, cy + size);
-    path.AddLineToPoint(cx - halfSize/2, cy + halfSize);
-    path.AddLineToPoint(cx + halfSize/2, cy + halfSize);
-    path.CloseSubpath();
-    gc->FillPath(path);
-    
-    // 左
-    wxColour leftColor = (dpad_state & DPAD_LEFT) ? wxColour(255, 100, 100) : wxColour(100, 100, 100);
-    gc->SetBrush(wxBrush(leftColor));
-    path = gc->CreatePath();
-    path.MoveToPoint(cx - size, cy);
-    path.AddLineToPoint(cx - halfSize, cy - halfSize/2);
-    path.AddLineToPoint(cx - halfSize, cy + halfSize/2);
-    path.CloseSubpath();
-    gc->FillPath(path);
+    pts.push_back(wxPoint2DDouble(center_x - core / 2, center_y - core / 2));
+    pts.push_back(wxPoint2DDouble(center_x - core / 2, center_y - core / 2 - arm));
+    pts.push_back(wxPoint2DDouble(center_x + core / 2, center_y - core / 2 - arm));
     
     // 右
-    wxColour rightColor = (dpad_state & DPAD_RIGHT) ? wxColour(255, 100, 100) : wxColour(100, 100, 100);
-    gc->SetBrush(wxBrush(rightColor));
-    path = gc->CreatePath();
-    path.MoveToPoint(cx + size, cy);
-    path.AddLineToPoint(cx + halfSize, cy - halfSize/2);
-    path.AddLineToPoint(cx + halfSize, cy + halfSize/2);
+    pts.push_back(wxPoint2DDouble(center_x + core / 2, center_y - core / 2));
+    pts.push_back(wxPoint2DDouble(center_x + core / 2 + arm, center_y - core / 2));
+    pts.push_back(wxPoint2DDouble(center_x + core / 2 + arm, center_y + core / 2));
+    
+    // 下
+    pts.push_back(wxPoint2DDouble(center_x + core / 2, center_y + core / 2));
+    pts.push_back(wxPoint2DDouble(center_x + core / 2, center_y + core / 2 + arm));
+    pts.push_back(wxPoint2DDouble(center_x - core / 2, center_y + core / 2 + arm));
+    
+    // 左
+    pts.push_back(wxPoint2DDouble(center_x - core / 2, center_y + core / 2));
+    pts.push_back(wxPoint2DDouble(center_x - core / 2 - arm, center_y + core / 2));
+    pts.push_back(wxPoint2DDouble(center_x - core / 2 - arm, center_y - core / 2));
+
+    // 基本の十字形状を描画
+    wxGraphicsPath path = gc->CreatePath();
+    path.MoveToPoint(pts[0]);
+    for (size_t i = 1; i < pts.size(); ++i) {
+        path.AddLineToPoint(pts[i]);
+    }
     path.CloseSubpath();
-    gc->FillPath(path);
+    gc->DrawPath(path);
+
+    // 押下時の表示
+    // 下
+    auto homeBase = CreateHomeBase(center_x, center_y, isize, 0);
+    if (controllerData.dpad & DPAD_DOWN) {
+        gc->SetBrush(*wxWHITE);
+        wxGraphicsPath homePath = gc->CreatePath();
+        homePath.MoveToPoint(homeBase[0]);
+        for (size_t i = 1; i < homeBase.size(); ++i) {
+            homePath.AddLineToPoint(homeBase[i]);
+        }
+        homePath.CloseSubpath();
+        gc->DrawPath(homePath);
+    }
+    gc->SetBrush(*wxTRANSPARENT_BRUSH);
+    
+    // 左
+    homeBase = CreateHomeBase(center_x, center_y, isize, M_PI / 2);
+    if (controllerData.dpad & DPAD_LEFT) {
+        gc->SetBrush(*wxWHITE);
+        wxGraphicsPath homePath = gc->CreatePath();
+        homePath.MoveToPoint(homeBase[0]);
+        for (size_t i = 1; i < homeBase.size(); ++i) {
+            homePath.AddLineToPoint(homeBase[i]);
+        }
+        homePath.CloseSubpath();
+        gc->DrawPath(homePath);
+    }
+    gc->SetBrush(*wxTRANSPARENT_BRUSH);
+    
+    // 上
+    homeBase = CreateHomeBase(center_x, center_y, isize, M_PI);
+    if (controllerData.dpad & DPAD_UP) {
+        gc->SetBrush(*wxWHITE);
+        wxGraphicsPath homePath = gc->CreatePath();
+        homePath.MoveToPoint(homeBase[0]);
+        for (size_t i = 1; i < homeBase.size(); ++i) {
+            homePath.AddLineToPoint(homeBase[i]);
+        }
+        homePath.CloseSubpath();
+        gc->DrawPath(homePath);
+    }
+    gc->SetBrush(*wxTRANSPARENT_BRUSH);
+    
+    // 右
+    homeBase = CreateHomeBase(center_x, center_y, isize, 3 * M_PI / 2);
+    if (controllerData.dpad & DPAD_RIGHT) {
+        gc->SetBrush(*wxWHITE);
+        wxGraphicsPath homePath = gc->CreatePath();
+        homePath.MoveToPoint(homeBase[0]);
+        for (size_t i = 1; i < homeBase.size(); ++i) {
+            homePath.AddLineToPoint(homeBase[i]);
+        }
+        homePath.CloseSubpath();
+        gc->DrawPath(homePath);
+    }
+    gc->SetBrush(*wxTRANSPARENT_BRUSH);
 }
