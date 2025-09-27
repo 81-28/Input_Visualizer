@@ -4,7 +4,6 @@
 #include <iostream>
 #include "ControllerPanel.h"
 #include "SerialUtils.h"
-#include "ControllerWindow.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -27,20 +26,16 @@ private:
     void OnConnect(wxCommandEvent& event);
     void OnRefresh(wxCommandEvent& event);
     void OnClose(wxCloseEvent& event);
-    void OnOpenRecordingWindow(wxCommandEvent& event);
     void PopulateComPorts();
     
     ControllerPanel* m_controllerPanel;
     wxChoice* m_comChoice;
     wxButton* m_connectButton;
     wxButton* m_refreshButton;
-    wxButton* m_recordingButton;
-    ControllerWindow* m_recordingWindow;
     
     enum {
         ID_CONNECT = 1000,
-        ID_REFRESH = 1001,
-        ID_RECORDING_WINDOW = 1002
+        ID_REFRESH = 1001
     };
     
     wxDECLARE_EVENT_TABLE();
@@ -49,7 +44,6 @@ private:
 wxBEGIN_EVENT_TABLE(MainFrame, wxFrame)
     EVT_BUTTON(ID_CONNECT, MainFrame::OnConnect)
     EVT_BUTTON(ID_REFRESH, MainFrame::OnRefresh)
-    EVT_BUTTON(ID_RECORDING_WINDOW, MainFrame::OnOpenRecordingWindow)
     EVT_CLOSE(MainFrame::OnClose)
 wxEND_EVENT_TABLE()
 
@@ -74,8 +68,7 @@ bool ProConVisualizerApp::OnInit()
 }
 
 MainFrame::MainFrame()
-    : wxFrame(nullptr, wxID_ANY, "Pro Controller Visualizer", wxDefaultPosition, wxSize(600, 500)),
-      m_recordingWindow(nullptr)
+    : wxFrame(nullptr, wxID_ANY, "Pro Controller Visualizer", wxDefaultPosition, wxSize(600, 500))
 {
     m_controllerPanel = new ControllerPanel(this);
     
@@ -84,13 +77,11 @@ MainFrame::MainFrame()
 
     m_comChoice = new wxChoice(topPanel, wxID_ANY);
     m_connectButton = new wxButton(topPanel, ID_CONNECT, "Connect");
-    m_recordingButton = new wxButton(topPanel, ID_RECORDING_WINDOW, "Recording Window");
 
     PopulateComPorts();
 
     topSizer->Add(m_comChoice, 1, wxEXPAND | wxRIGHT, 5);
-    topSizer->Add(m_connectButton, 0, wxEXPAND | wxRIGHT, 5);
-    topSizer->Add(m_recordingButton, 0, wxEXPAND);
+    topSizer->Add(m_connectButton, 0, wxEXPAND);
 
     topPanel->SetSizer(topSizer);
 
@@ -164,29 +155,8 @@ void MainFrame::OnRefresh(wxCommandEvent& event)
     wxLogMessage("COM ports refreshed. Found %d ports", m_comChoice->GetCount());
 }
 
-void MainFrame::OnOpenRecordingWindow(wxCommandEvent& event)
-{
-    if (!m_recordingWindow) {
-        m_recordingWindow = new ControllerWindow(this, m_controllerPanel);
-    }
-    
-    if (m_recordingWindow->IsShown()) {
-        m_recordingWindow->Hide();
-        m_recordingButton->SetLabel("Recording Window");
-    } else {
-        m_recordingWindow->Show();
-        m_recordingButton->SetLabel("Hide Recording");
-    }
-}
-
 void MainFrame::OnClose(wxCloseEvent& event)
 {
     m_controllerPanel->DisconnectSerial();
-    
-    if (m_recordingWindow) {
-        m_recordingWindow->Destroy();
-        m_recordingWindow = nullptr;
-    }
-    
     event.Skip();
 }
