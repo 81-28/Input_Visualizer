@@ -46,6 +46,11 @@ public:
     bool ConnectSerial(const wxString& portName);
     void DisconnectSerial();
     bool IsConnected() const { return connected; }
+    
+    // 録画ウィンドウ用のデータアクセス
+    bool IsDataValid() const { return dataValid; }
+    ControllerData GetControllerData() const { return controllerData; }
+    std::mutex& GetDataMutex() { return dataMutex; }
 
 private:
     void OnPaint(wxPaintEvent& event);

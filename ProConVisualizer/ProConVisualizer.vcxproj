@@ -162,10 +162,12 @@
     <ClCompile Include="ProConVisualizer.cpp" />
     <ClCompile Include="ControllerPanel.cpp" />
     <ClCompile Include="SerialUtils.cpp" />
+    <ClCompile Include="ControllerWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ControllerPanel.h" />
     <ClInclude Include="SerialUtils.h" />
+    <ClInclude Include="ControllerWindow.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
