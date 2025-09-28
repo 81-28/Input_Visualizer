@@ -17,14 +17,13 @@ const int STICK_LY_MIN = 420, STICK_LY_NEUTRAL = 2055, STICK_LY_MAX = 3780;
 const int STICK_RX_MIN = 460, STICK_RX_NEUTRAL = 2075, STICK_RX_MAX = 3580;
 const int STICK_RY_MIN = 320, STICK_RY_NEUTRAL = 1877, STICK_RY_MAX = 3550;
 
-// [ここが重要] スティックのデッドゾーン設定
-// ニュートラルを中心とした無反応範囲の半径をコントローラーの生の値(0-4095)で指定します。
-// 150は、ニュートラルから上下左右に約7%の範囲を無反応にします。(150 / (2048-200))
+// スティックのデッドゾーン設定
+// ニュートラルを中心とした無反応範囲の半径をコントローラーの生の値(0-4095)で指定
 // この値を大きくするとデッドゾーンが広がり、小さくすると狭まります。
 const int STICK_DEADZONE_RADIUS = 100;
 
 // ================================================================
-// 通信プロトコル定義 (変更なし)
+// 通信プロトコル定義
 // ================================================================
 struct ControllerData {
   uint16_t buttons;
@@ -52,7 +51,7 @@ struct ControllerData {
 #define DPAD_RIGHT (1 << 3)
 
 // ================================================================
-// Proコントローラーの定義と初期化 (変更なし)
+// Proコントローラーの定義と初期化
 // ================================================================
 #define HOST_PIN_DP 12
 Adafruit_USBH_Host USBHost;
@@ -88,8 +87,6 @@ uint8_t map_stick_axis(int value, int min_in, int neutral_in, int max_in) {
     return map(value, neutral_in + STICK_DEADZONE_RADIUS, max_in, 129, 255);
   }
 }
-
-// (以下、以前の安定版コードから変更なし)
 
 void send_report(uint8_t size) {
   out_report.sequence_counter = seq_counter++ & 0x0F;
@@ -131,23 +128,6 @@ uint8_t crc8(const uint8_t *data, int len) {
   uint8_t crc = 0;
   while (len--) { crc ^= *data++; for (int i = 0; i < 8; i++) crc = crc & 0x80 ? (crc << 1) ^ 0x31 : crc << 1; }
   return crc;
-}
-
-void send_cobs_packet(const uint8_t *data, size_t length) {
-  uint8_t encoded_buffer[length + 2];
-  size_t read_index = 0, write_index = 1, code_index = 0;
-  uint8_t code = 1;
-  while (read_index < length) {
-    if (data[read_index] == 0) {
-      encoded_buffer[code_index] = code; code = 1; code_index = write_index++; read_index++;
-    } else {
-      encoded_buffer[write_index++] = data[read_index++]; code++;
-      if (code == 0xFF) { encoded_buffer[code_index] = code; code = 1; code_index = write_index++; }
-    }
-  }
-  encoded_buffer[code_index] = code;
-  Serial1.write(encoded_buffer, write_index);
-  Serial1.write((uint8_t)0x00);
 }
 
 void send_spi_packet(const uint8_t *data, size_t length) {
@@ -204,7 +184,6 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
 void setup() {}
 void loop() {}
 void setup1() {
-  Serial1.begin(115200);
   pixels.begin();
   pixels.setPixelColor(0, pixels.Color(0, 0, 15)); pixels.show();
   delay(500);

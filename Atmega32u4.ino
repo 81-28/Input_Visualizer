@@ -1,5 +1,5 @@
 // ================================================================
-// Proコントローラー to Switch 変換コード (SPI受信版)
+// Proコントローラー to Switch 変換コード
 // ================================================================
 
 #include <NintendoSwitchControlLibrary.h>
@@ -58,15 +58,11 @@ void setup() {
   pushButton(Button::R, 20, 2);
   
   // SPI pin setup
-  pinMode(MISO_PIN, OUTPUT);     // Not used but set as output
-  pinMode(MOSI_PIN, INPUT);      // Data input
-  pinMode(SCK_PIN, INPUT);       // Clock input
-  pinMode(SS_PIN, INPUT_PULLUP); // CS with pullup
-  
-  // Disable hardware SPI (use software control)
-  SPCR = 0;
-  
-  // CS interrupt
+  // pinMode(MISO_PIN, OUTPUT);
+  pinMode(MOSI_PIN, INPUT);
+  pinMode(SCK_PIN, INPUT);
+  pinMode(SS_PIN, INPUT_PULLUP);
+  SPCR = 0; // Disable hardware SPI
   attachInterrupt(digitalPinToInterrupt(SS_PIN), onCSFalling, FALLING);
   
   memset(&controller_input, 0, sizeof(controller_input));
@@ -89,7 +85,7 @@ void loop() {
 }
 
 // ================================================================
-// メインの変換処理 (修正版)
+// メインの変換処理
 // ================================================================
 void update_switch_state() {
   // --- スティックの更新 ---
@@ -97,17 +93,14 @@ void update_switch_state() {
   SwitchControlLibrary().moveLeftStick(controller_input.stick_lx, 255 - controller_input.stick_ly);
   SwitchControlLibrary().moveRightStick(controller_input.stick_rx, 255 - controller_input.stick_ry);
 
-  // [修正] 各ボタンを個別で判定し、ライブラリの関数を直接呼び出す
-  // Yボタン
+  // 各ボタンを個別で判定し、ライブラリの関数を直接呼び出す
+  // Y / B / A / X ボタン
   if ((controller_input.buttons & BTN_Y) && !(previous_input.buttons & BTN_Y)) SwitchControlLibrary().pressButton(Button::Y);
   else if (!(controller_input.buttons & BTN_Y) && (previous_input.buttons & BTN_Y)) SwitchControlLibrary().releaseButton(Button::Y);
-  // Bボタン
   if ((controller_input.buttons & BTN_B) && !(previous_input.buttons & BTN_B)) SwitchControlLibrary().pressButton(Button::B);
   else if (!(controller_input.buttons & BTN_B) && (previous_input.buttons & BTN_B)) SwitchControlLibrary().releaseButton(Button::B);
-  // Aボタン
   if ((controller_input.buttons & BTN_A) && !(previous_input.buttons & BTN_A)) SwitchControlLibrary().pressButton(Button::A);
   else if (!(controller_input.buttons & BTN_A) && (previous_input.buttons & BTN_A)) SwitchControlLibrary().releaseButton(Button::A);
-  // Xボタン
   if ((controller_input.buttons & BTN_X) && !(previous_input.buttons & BTN_X)) SwitchControlLibrary().pressButton(Button::X);
   else if (!(controller_input.buttons & BTN_X) && (previous_input.buttons & BTN_X)) SwitchControlLibrary().releaseButton(Button::X);
   // L / R ボタン
@@ -177,25 +170,18 @@ uint8_t receiveByte() {
   
   // 各ビットを受信 (MSB first)
   for (int bit = 7; bit >= 0; bit--) {
-    unsigned long timeout = micros() + 100000; // 100ms per bit
+    unsigned long timeout = micros() + 10000; // 10ms per bit
     
     // クロック立ち上がり待ち
-    while (digitalRead(SCK_PIN) == LOW && digitalRead(SS_PIN) == LOW && micros() < timeout) {
-      delayMicroseconds(1);
-    }
+    while (digitalRead(SCK_PIN) == LOW && digitalRead(SS_PIN) == LOW && micros() < timeout);
     
     if (digitalRead(SS_PIN) == LOW && micros() < timeout) {
-      delayMicroseconds(10);  // クロックの中央でサンプリング
-      
-      if (digitalRead(MOSI_PIN)) {
-        byte_data |= (1 << bit);
-      }
+      delayMicroseconds(10);
+      if (digitalRead(MOSI_PIN)) byte_data |= (1 << bit);
       
       // クロック立ち下がり待ち
-      timeout = micros() + 100000;
-      while (digitalRead(SCK_PIN) == HIGH && digitalRead(SS_PIN) == LOW && micros() < timeout) {
-        delayMicroseconds(1);
-      }
+      timeout = micros() + 10000;
+      while (digitalRead(SCK_PIN) == HIGH && digitalRead(SS_PIN) == LOW && micros() < timeout);
     } else {
       break;
     }
