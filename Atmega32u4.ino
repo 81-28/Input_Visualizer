@@ -1,8 +1,14 @@
 // ================================================================
-// Proコントローラー to Switch 変換コード (ボタン処理修正・最終版)
+// Proコントローラー to Switch 変換コード (SPI受信版)
 // ================================================================
 
 #include <NintendoSwitchControlLibrary.h>
+
+// SPI通信設定
+#define SS_PIN   7    // CS signal from RP2350 Pin 1
+#define MISO_PIN 14   // SPI MISO (unused)
+#define SCK_PIN  15   // SPI SCK  <- RP2350 Pin 2
+#define MOSI_PIN 16   // SPI MOSI <- RP2350 Pin 3
 
 // --- 通信プロトコル定義 (RP2350側と完全に一致) ---
 struct ControllerData {
@@ -37,32 +43,32 @@ struct ControllerData {
 ControllerData controller_input;
 ControllerData previous_input;
 
-// --- COBS+CRC8受信関連のコード (変更なし) ---
-uint8_t cobs_buffer[sizeof(ControllerData) + 2];
-size_t cobs_buffer_index = 0;
+// SPI受信用バッファ
+uint8_t spi_buffer[sizeof(ControllerData)];
+volatile bool data_received = false;
 uint8_t crc8(const uint8_t *data, int len) {
   uint8_t crc = 0;
   while(len--){crc^=*data++;for(int i=0;i<8;i++)crc=crc&0x80?(crc<<1)^0x31:crc<<1;}
   return crc;
-}
-void cobs_decode_and_process(const uint8_t *buffer, size_t length) {
-  if (length < 2 || length > sizeof(cobs_buffer)) return;
-  uint8_t decoded_buffer[length];
-  size_t read_index = 0, write_index = 0;
-  while(read_index<length){uint8_t code=buffer[read_index++];for(uint8_t i=1;i<code;i++){if(read_index>=length)return;decoded_buffer[write_index++]=buffer[read_index++];}if(code<0xFF&&read_index<length)decoded_buffer[write_index++]=0;}
-  if (write_index != sizeof(ControllerData)) return;
-  ControllerData received_data;
-  memcpy(&received_data, decoded_buffer, sizeof(ControllerData));
-  uint8_t received_crc = received_data.crc;
-  received_data.crc = 0;
-  uint8_t calculated_crc = crc8((uint8_t*)&received_data, sizeof(received_data));
-  if (received_crc == calculated_crc) memcpy(&controller_input, &received_data, sizeof(ControllerData));
 }
 
 void setup() {
   Serial1.begin(115200);
   pushButton(Button::L, 20, 2);
   pushButton(Button::R, 20, 2);
+  
+  // SPI pin setup
+  pinMode(MISO_PIN, OUTPUT);     // Not used but set as output
+  pinMode(MOSI_PIN, INPUT);      // Data input
+  pinMode(SCK_PIN, INPUT);       // Clock input
+  pinMode(SS_PIN, INPUT_PULLUP); // CS with pullup
+  
+  // Disable hardware SPI (use software control)
+  SPCR = 0;
+  
+  // CS interrupt
+  attachInterrupt(digitalPinToInterrupt(SS_PIN), onCSFalling, FALLING);
+  
   memset(&controller_input, 0, sizeof(controller_input));
   controller_input.stick_lx = 128;
   controller_input.stick_ly = 128;
@@ -72,7 +78,10 @@ void setup() {
 }
 
 void loop() {
-  receive_controller_data();
+  if (data_received) {
+    process_received_data();
+    data_received = false;
+  }
   update_switch_state();
   SwitchControlLibrary().sendReport();
   memcpy(&previous_input, &controller_input, sizeof(controller_input));
@@ -147,16 +156,85 @@ void update_switch_state() {
   }
 }
 
-// RP2350からのデータ受信に専念する関数
-void receive_controller_data() {
-  while (Serial1.available() > 0) {
-    uint8_t receivedByte = Serial1.read();
-    if (receivedByte == 0) {
-      if (cobs_buffer_index > 0) cobs_decode_and_process(cobs_buffer, cobs_buffer_index);
-      cobs_buffer_index = 0;
-    } else {
-      if (cobs_buffer_index < sizeof(cobs_buffer)) cobs_buffer[cobs_buffer_index++] = receivedByte;
-      else cobs_buffer_index = 0;
+// SPI割り込み処理
+void onCSFalling() {
+  size_t byte_index = 0;
+  
+  while (digitalRead(SS_PIN) == LOW && byte_index < sizeof(ControllerData)) {
+    spi_buffer[byte_index] = receiveByte();
+    if (digitalRead(SS_PIN) == LOW) {
+      byte_index++;
     }
   }
+  
+  if (byte_index == sizeof(ControllerData)) {
+    data_received = true;
+  }
+}
+
+uint8_t receiveByte() {
+  uint8_t byte_data = 0;
+  
+  // 各ビットを受信 (MSB first)
+  for (int bit = 7; bit >= 0; bit--) {
+    unsigned long timeout = micros() + 100000; // 100ms per bit
+    
+    // クロック立ち上がり待ち
+    while (digitalRead(SCK_PIN) == LOW && digitalRead(SS_PIN) == LOW && micros() < timeout) {
+      delayMicroseconds(1);
+    }
+    
+    if (digitalRead(SS_PIN) == LOW && micros() < timeout) {
+      delayMicroseconds(10);  // クロックの中央でサンプリング
+      
+      if (digitalRead(MOSI_PIN)) {
+        byte_data |= (1 << bit);
+      }
+      
+      // クロック立ち下がり待ち
+      timeout = micros() + 100000;
+      while (digitalRead(SCK_PIN) == HIGH && digitalRead(SS_PIN) == LOW && micros() < timeout) {
+        delayMicroseconds(1);
+      }
+    } else {
+      break;
+    }
+  }
+  
+  return byte_data;
+}
+
+void process_received_data() {
+  ControllerData received_data;
+  memcpy(&received_data, spi_buffer, sizeof(ControllerData));
+  
+  // CRC確認
+  uint8_t received_crc = received_data.crc;
+  received_data.crc = 0;
+  uint8_t calculated_crc = crc8((uint8_t*)&received_data, sizeof(received_data));
+  
+  if (received_crc == calculated_crc) {
+    memcpy(&controller_input, &received_data, sizeof(ControllerData));
+    
+    // CRCを復元してからCOBS形式でPCに送信
+    controller_input.crc = received_crc;
+    send_cobs_packet((uint8_t*)&controller_input, sizeof(controller_input));
+  }
+}
+
+void send_cobs_packet(const uint8_t *data, size_t length) {
+  uint8_t encoded_buffer[length + 2];
+  size_t read_index = 0, write_index = 1, code_index = 0;
+  uint8_t code = 1;
+  while (read_index < length) {
+    if (data[read_index] == 0) {
+      encoded_buffer[code_index] = code; code = 1; code_index = write_index++; read_index++;
+    } else {
+      encoded_buffer[write_index++] = data[read_index++]; code++;
+      if (code == 0xFF) { encoded_buffer[code_index] = code; code = 1; code_index = write_index++; }
+    }
+  }
+  encoded_buffer[code_index] = code;
+  Serial1.write(encoded_buffer, write_index);
+  Serial1.write((uint8_t)0x00);
 }

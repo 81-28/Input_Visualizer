@@ -1,6 +1,13 @@
 #include "pio_usb.h"
 #include "Adafruit_TinyUSB.h"
 #include "tusb.h"
+#include <SPI.h>
+
+// ================================================================
+// SPI通信設定
+// ================================================================
+#define SPI_CS_PIN 1    // CS to ATMega32u4 Pin 7
+#define SPI_SPEED 10000 // 10kHz
 
 // ================================================================
 // スティックキャリブレーション設定
@@ -143,6 +150,21 @@ void send_cobs_packet(const uint8_t *data, size_t length) {
   Serial1.write((uint8_t)0x00);
 }
 
+void send_spi_packet(const uint8_t *data, size_t length) {
+  SPI.beginTransaction(SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0));
+  digitalWrite(SPI_CS_PIN, LOW);
+  delayMicroseconds(100);
+  
+  for (size_t i = 0; i < length; i++) {
+    SPI.transfer(data[i]);
+    delayMicroseconds(10);
+  }
+  
+  delayMicroseconds(100);
+  digitalWrite(SPI_CS_PIN, HIGH);
+  SPI.endTransaction();
+}
+
 void process_and_send_report(uint8_t const* report) {
   ControllerData data;
   uint8_t r = report[3], m = report[4], l = report[5];
@@ -156,7 +178,7 @@ void process_and_send_report(uint8_t const* report) {
   
   data.crc = 0;
   data.crc = crc8((uint8_t*)&data, sizeof(data));
-  send_cobs_packet((uint8_t*)&data, sizeof(data));
+  send_spi_packet((uint8_t*)&data, sizeof(data));
 }
 
 void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc, uint16_t len) {
@@ -186,6 +208,15 @@ void setup1() {
   pixels.begin();
   pixels.setPixelColor(0, pixels.Color(0, 0, 15)); pixels.show();
   delay(500);
+  
+  // SPI初期化
+  SPI.setSCK(2);
+  SPI.setTX(3);  
+  SPI.setRX(0);
+  SPI.begin();
+  pinMode(SPI_CS_PIN, OUTPUT);
+  digitalWrite(SPI_CS_PIN, HIGH);
+  
   pio_usb_configuration_t pio_cfg = PIO_USB_DEFAULT_CONFIG;
   pio_cfg.pin_dp = HOST_PIN_DP;
   USBHost.configure_pio_usb(1, &pio_cfg);
