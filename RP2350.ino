@@ -20,7 +20,7 @@ const int STICK_RY_MIN = 320, STICK_RY_NEUTRAL = 1877, STICK_RY_MAX = 3550;
 // スティックのデッドゾーン設定
 // ニュートラルを中心とした無反応範囲の半径をコントローラーの生の値(0-4095)で指定
 // この値を大きくするとデッドゾーンが広がり、小さくすると狭まります。
-const int STICK_DEADZONE_RADIUS = 100;
+const int STICK_DEADZONE_RADIUS = 150;
 
 // ================================================================
 // 通信プロトコル定義
@@ -71,10 +71,10 @@ OutputReport out_report;
 // ================================================================
 // スティックの値変換関数 (デッドゾーン対応版)
 // ================================================================
-uint8_t map_stick_axis(int value, int min_in, int neutral_in, int max_in) {
+uint8_t map_stick_axis(int value, int min_in, int neutral_in, int max_in, uint8_t newtral = 128) {
   // 1. 値がデッドゾーンの範囲内かチェック
   if (abs(value - neutral_in) < STICK_DEADZONE_RADIUS) {
-    return 128; // 範囲内ならニュートラル(128)を返す
+    return newtral; // 範囲内ならニュートラルを返す
   }
 
   // 2. デッドゾーン外の値をマッピング
@@ -152,10 +152,10 @@ void process_and_send_report(uint8_t const* report) {
   data.dpad=0; if(l&1)data.dpad|=DPAD_DOWN; if(l&2)data.dpad|=DPAD_UP; if(l&4)data.dpad|=DPAD_RIGHT; if(l&8)data.dpad|=DPAD_LEFT;
   
   data.stick_lx = map_stick_axis(report[6]|((report[7]&0xF)<<8), STICK_LX_MIN, STICK_LX_NEUTRAL, STICK_LX_MAX);
-  data.stick_ly = map_stick_axis((report[7]>>4)|(report[8]<<4), STICK_LY_MIN, STICK_LY_NEUTRAL, STICK_LY_MAX);
+  data.stick_ly = 255 - map_stick_axis((report[7]>>4)|(report[8]<<4), STICK_LY_MIN, STICK_LY_NEUTRAL, STICK_LY_MAX, 127);
   data.stick_rx = map_stick_axis(report[9]|((report[10]&0xF)<<8), STICK_RX_MIN, STICK_RX_NEUTRAL, STICK_RX_MAX);
-  data.stick_ry = map_stick_axis((report[10]>>4)|(report[11]<<4), STICK_RY_MIN, STICK_RY_NEUTRAL, STICK_RY_MAX);
-  
+  data.stick_ry = 255 - map_stick_axis((report[10]>>4)|(report[11]<<4), STICK_RY_MIN, STICK_RY_NEUTRAL, STICK_RY_MAX, 127);
+
   data.crc = 0;
   data.crc = crc8((uint8_t*)&data, sizeof(data));
   send_spi_packet((uint8_t*)&data, sizeof(data));

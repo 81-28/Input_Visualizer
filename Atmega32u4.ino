@@ -89,9 +89,9 @@ void loop() {
 // ================================================================
 void update_switch_state() {
   // --- スティックの更新 ---
-  // Y軸は多くのゲームで上下反転しているため、(255 - 値) で補正
-  SwitchControlLibrary().moveLeftStick(controller_input.stick_lx, 255 - controller_input.stick_ly);
-  SwitchControlLibrary().moveRightStick(controller_input.stick_rx, 255 - controller_input.stick_ry);
+  // Y軸反転はRP2350.ino側で処理済み
+  SwitchControlLibrary().moveLeftStick(controller_input.stick_lx, controller_input.stick_ly);
+  SwitchControlLibrary().moveRightStick(controller_input.stick_rx, controller_input.stick_ry);
 
   // 各ボタンを個別で判定し、ライブラリの関数を直接呼び出す
   // Y / B / A / X ボタン

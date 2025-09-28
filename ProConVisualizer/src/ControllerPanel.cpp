@@ -318,7 +318,7 @@ void ControllerPanel::DrawController(wxGraphicsContext* gc)
     }
     
     stick_x = center_x + stick_x * radius;
-    stick_y = center_y - stick_y * radius;
+    stick_y = center_y + stick_y * radius; // Y軸反転はRP2350.ino側で処理済み
     
     gc->DrawEllipse(stick_x - radius, stick_y - radius, radius * 2, radius * 2);
     
@@ -360,7 +360,7 @@ void ControllerPanel::DrawController(wxGraphicsContext* gc)
     }
     
     stick_x = center_x + stick_x * radius;
-    stick_y = center_y - stick_y * radius;
+    stick_y = center_y + stick_y * radius; // Y軸反転はRP2350.ino側で処理済み
     
     gc->DrawEllipse(stick_x - radius, stick_y - radius, radius * 2, radius * 2);
     
@@ -453,9 +453,9 @@ void ControllerPanel::DrawStick(wxGraphicsContext* gc, double cx, double cy, dou
     gc->SetPen(wxPen(wxColour(150, 150, 150), 2));
     gc->DrawEllipse(cx - radius, cy - radius, radius * 2, radius * 2);
     
-    // スティック位置を計算 (128が中央、Y軸は反転)
+    // スティック位置を計算 (128が中央、Y軸反転はRP2350.ino側で処理済み)
     double stickX = cx + (x_val - 128) * radius / 128.0;
-    double stickY = cy - (y_val - 128) * radius / 128.0;  // Y軸反転
+    double stickY = cy + (y_val - 128) * radius / 128.0;  // Y軸反転済み
     
     // スティック位置を制限
     double dx = stickX - cx;
