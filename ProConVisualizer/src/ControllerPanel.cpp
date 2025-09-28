@@ -277,8 +277,6 @@ void ControllerPanel::DrawController(wxGraphicsContext* gc)
     wxPen whitePen(*wxWHITE, 3, wxPENSTYLE_SOLID);
     wxPen whitePenS(*wxWHITE, 2, wxPENSTYLE_SOLID);
     
-    double deadzone = 0.05;
-    
     // Lスティック（八角形 + 円形）
     gc->SetPen(wxPen(*wxWHITE, 3));
     gc->SetBrush(*wxTRANSPARENT_BRUSH);
@@ -310,12 +308,6 @@ void ControllerPanel::DrawController(wxGraphicsContext* gc)
     
     double stick_x = (double)(controllerData.stick_lx - 128) / 128.0;
     double stick_y = (double)(controllerData.stick_ly - 128) / 128.0;
-    
-    // デッドゾーン
-    if (hypot(stick_x, stick_y) < deadzone) {
-        stick_x = 0;
-        stick_y = 0;
-    }
     
     stick_x = center_x + stick_x * radius;
     stick_y = center_y + stick_y * radius; // Y軸反転はRP2350.ino側で処理済み
@@ -352,12 +344,6 @@ void ControllerPanel::DrawController(wxGraphicsContext* gc)
     
     stick_x = (double)(controllerData.stick_rx - 128) / 128.0;
     stick_y = (double)(controllerData.stick_ry - 128) / 128.0;
-    
-    // デッドゾーン
-    if (hypot(stick_x, stick_y) < deadzone) {
-        stick_x = 0;
-        stick_y = 0;
-    }
     
     stick_x = center_x + stick_x * radius;
     stick_y = center_y + stick_y * radius; // Y軸反転はRP2350.ino側で処理済み

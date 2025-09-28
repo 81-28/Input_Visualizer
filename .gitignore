@@ -15,7 +15,10 @@ Visualizer/Visualizer.vcxproj.user
 /Visualizer/x64
 /Visualizer/enc_temp_folder
 
-build
+.vs
 .vscode
+build
 /ProConVisualizer/build
 /ProConVisualizer/x64
+/ProConVisualizer/ProConVisualizer.sln
+/ProConVisualizer/ProConVisualizer.vcxproj
