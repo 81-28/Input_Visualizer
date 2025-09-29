@@ -53,7 +53,25 @@ Pro Controller → RP2350 → ATMega32U4 → PC (Windows GUI)
 - **シリアル通信**: ATMega32U4 ↔ PC間でCOBS エンコーディングを使用
 - **CRC8**: データ整合性チェック
 
-## ビルド・実行
+## RP2350の使い方（接続監視）
+
+### 簡単セットアップ
+1. `RP2350.ino`をRP2350に書き込み
+2. Pro ControllerをRP2350のUSBポートに接続
+3. RP2350をUSB電源またはPCに接続
+
+### LED状態表示
+- 🔵 **青色**: Pro Controller待機中
+- 🟡 **黄色**: Pro Controller接続中（初期化中）
+- 🟢 **緑色**: Pro Controller接続完了
+- 🔴 **赤色**: Pro Controller切断
+
+### 使い方
+- **USB電源のみ**: LEDで接続状態を確認
+- **PC接続時**: シリアルモニタで、接続/切断ログも確認可能
+- **切断時**: Pro Controller再接続 → PC/電源再接続で復旧
+
+## フルシステム（可視化）のビルド・実行
 
 ### マイコン側
 1. Arduino IDEでそれぞれの`.ino`ファイルを対応するマイコンに書き込み

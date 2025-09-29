@@ -69,6 +69,23 @@ struct OutputReport { uint8_t command, sequence_counter, rumble_l[4], rumble_r[4
 OutputReport out_report;
 
 // ================================================================
+// 接続監視用変数
+// ================================================================
+unsigned long last_data_time = 0;  // 最後にデータを受信した時刻
+const unsigned long CONNECTION_TIMEOUT = 3000;  // 3秒でタイムアウト
+bool connection_lost = false;
+unsigned long mount_time = 0;  // マウントされた時刻
+bool device_physically_connected = false;  // 物理的な接続状態
+int send_report_failures = 0;  // 送信失敗回数
+unsigned long last_mount_time = 0;  // 最後のマウント時刻
+unsigned long last_unmount_time = 0;  // 最後のアンマウント時刻
+int report_count = 0;  // 受信したレポート数
+bool debug_mode = false;  // デバッグモード（無効）
+int short_report_count = 0;  // 短いレポートの連続数
+const int SHORT_REPORT_THRESHOLD = 3;  // 3回連続で切断判定
+bool controller_disconnected = false;  // コントローラーが切断された状態
+
+// ================================================================
 // スティックの値変換関数 (デッドゾーン対応版)
 // ================================================================
 uint8_t map_stick_axis(int value, int min_in, int neutral_in, int max_in, uint8_t newtral = 128) {
@@ -90,7 +107,23 @@ uint8_t map_stick_axis(int value, int min_in, int neutral_in, int max_in, uint8_
 
 void send_report(uint8_t size) {
   out_report.sequence_counter = seq_counter++ & 0x0F;
-  tuh_hid_send_report(procon_addr, procon_instance, 0, (uint8_t*)&out_report, size);
+  bool success = tuh_hid_send_report(procon_addr, procon_instance, 0, (uint8_t*)&out_report, size);
+  
+  if (!success) {
+    send_report_failures++;
+    if (send_report_failures > 3) {
+      if (Serial && Serial.availableForWrite() > 0) {
+        Serial.println("[" + getTimeString() + "] Pro Controller disconnected (send failures)");
+        Serial.println("To reconnect:");
+        Serial.println("1. Reconnect Pro Controller USB cable");
+        Serial.println("2. Reconnect this device to PC");
+      }
+      controller_disconnected = true;
+      device_physically_connected = false;
+    }
+  } else {
+    send_report_failures = 0;  // 成功したらカウンタリセット
+  }
 }
 
 void advance_init() {
@@ -118,10 +151,51 @@ void advance_init() {
     case InitState::FULL_REPORT:
       report_size = 12; out_report.command = 0x01; out_report.sub_command = 0x03; out_report.sub_command_args[0] = 0x30;
       send_report(report_size); init_state = InitState::DONE;
+      if (Serial && Serial.availableForWrite() > 0) {
+        Serial.println("[" + getTimeString() + "] Pro Controller initialization completed");
+      }
       pixels.setPixelColor(0, pixels.Color(0, 15, 0)); pixels.show();
       break;
     default: break;
   }
+}
+
+// ================================================================
+// 時刻表示関数
+// ================================================================
+String getTimeString() {
+  unsigned long ms = millis();
+  unsigned long seconds = ms / 1000;
+  unsigned long minutes = seconds / 60;
+  unsigned long hours = minutes / 60;
+  
+  ms %= 1000;
+  seconds %= 60;
+  minutes %= 60;
+  hours %= 24;
+  
+  return String(hours) + "h" + String(minutes) + "m" + String(seconds) + "s" + String(ms) + "ms";
+}
+
+
+
+
+
+// ================================================================
+// 状態リセット関数
+// ================================================================
+void reset_controller_state() {
+  is_procon = false;
+  procon_addr = 0;
+  procon_instance = 0;
+  init_state = InitState::HANDSHAKE;
+  seq_counter = 0;
+  last_data_time = 0;
+  connection_lost = false;
+  mount_time = 0;
+  device_physically_connected = false;
+  send_report_failures = 0;
+  short_report_count = 0;
 }
 
 uint8_t crc8(const uint8_t *data, int len) {
@@ -164,28 +238,141 @@ void process_and_send_report(uint8_t const* report) {
 void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc, uint16_t len) {
   uint16_t vid, pid;
   tuh_vid_pid_get(dev_addr, &vid, &pid);
+  
   if (vid == VID_NINTENDO && pid == PID_SWITCH_PRO) {
-    procon_addr = dev_addr; procon_instance = instance; is_procon = true; init_state = InitState::HANDSHAKE;
-    pixels.setPixelColor(0, pixels.Color(20, 20, 0)); pixels.show();
+    // 切断状態の場合は新しい接続を拒否
+    if (controller_disconnected) {
+      if (Serial && Serial.availableForWrite() > 0) {
+        Serial.println("[" + getTimeString() + "] Controller connection blocked - restart required");
+      }
+      tuh_hid_receive_report(dev_addr, instance);
+      return;
+    }
+    
+    procon_addr = dev_addr; procon_instance = instance; is_procon = true;
+    init_state = InitState::HANDSHAKE;
+    last_data_time = millis();
+    device_physically_connected = true;
+    if (Serial && Serial.availableForWrite() > 0) {
+      Serial.println("[" + getTimeString() + "] Pro Controller connected");
+    }
+    pixels.setPixelColor(0, pixels.Color(15, 15, 0)); pixels.show();
     advance_init();
   }
+  
   tuh_hid_receive_report(dev_addr, instance);
 }
 void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* report, uint16_t len) {
+  // 切断状態の場合は処理を停止
+  if (controller_disconnected) {
+    tuh_hid_receive_report(dev_addr, instance);
+    return;
+  }
+  
   if (is_procon && dev_addr == procon_addr) {
-    if (init_state != InitState::DONE) advance_init();
-    else if (len >= 12) process_and_send_report(report);
+    // レポートの長さで切断を判定
+    if (len < 12) {  // 正常なプロコンレポートは12バイト以上
+      short_report_count++;
+      
+      // 短いレポートが連続した場合、切断と判定
+      if (short_report_count >= SHORT_REPORT_THRESHOLD) {
+        if (Serial && Serial.availableForWrite() > 0) {
+          Serial.println("[" + getTimeString() + "] Pro Controller disconnected");
+          Serial.println("To reconnect:");
+          Serial.println("1. Reconnect Pro Controller USB cable");
+          Serial.println("2. Reconnect this device to PC");
+        }
+        controller_disconnected = true;
+        device_physically_connected = false;
+        is_procon = false;
+        pixels.setPixelColor(0, pixels.Color(15, 0, 0)); pixels.show();
+        tuh_hid_receive_report(dev_addr, instance);
+        return;
+      }
+    } else {
+      // 正常なレポートを受信したらカウンタをリセット
+      short_report_count = 0;
+      last_data_time = millis();
+      connection_lost = false;
+      
+      if (init_state != InitState::DONE) {
+        advance_init();
+      } else {
+        process_and_send_report(report);
+      }
+    }
   }
   tuh_hid_receive_report(dev_addr, instance);
 }
 void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
-  if (dev_addr == procon_addr) { is_procon = false; procon_addr = 0; pixels.setPixelColor(0, pixels.Color(20, 0, 0)); pixels.show(); }
+  if (dev_addr == procon_addr) {
+    if (Serial && Serial.availableForWrite() > 0) {
+      Serial.println("[" + getTimeString() + "] Pro Controller disconnected");
+      Serial.println("To reconnect:");
+      Serial.println("1. Reconnect Pro Controller USB cable");
+      Serial.println("2. Reconnect this device to PC");
+    }
+    controller_disconnected = true;
+    device_physically_connected = false;
+    is_procon = false;
+    pixels.setPixelColor(0, pixels.Color(15, 0, 0)); pixels.show();
+  }
 }
+// ================================================================
+// 接続状態チェック関数
+// ================================================================
+void check_connection_status() {
+  static unsigned long last_check = 0;
+  static bool timeout_reported = false;
+  
+  // 1秒ごとにチェック
+  if (millis() - last_check < 1000) return;
+  last_check = millis();
+  
+  if (is_procon && device_physically_connected) {
+    unsigned long time_since_last_data = millis() - last_data_time;
+    
+    // 送信失敗が多い場合は即座に切断判定
+    if (send_report_failures > 3) {
+      if (Serial && Serial.availableForWrite() > 0) {
+        Serial.println("[" + getTimeString() + "] *** TOO MANY SEND FAILURES - CONTROLLER DISCONNECTED ***");
+      }
+      device_physically_connected = false;
+      reset_controller_state();
+      pixels.setPixelColor(0, pixels.Color(15, 0, 0)); pixels.show();
+      return;
+    }
+    
+    // 補助的なタイムアウトチェック（レポート長検知が主）
+    if (time_since_last_data > 15000 && !timeout_reported) {
+      timeout_reported = true;
+      if (Serial && Serial.availableForWrite() > 0) {
+        Serial.println("[" + getTimeString() + "] Pro Controller disconnected (timeout)");
+        Serial.println("To reconnect:");
+        Serial.println("1. Reconnect Pro Controller USB cable");
+        Serial.println("2. Reconnect this device to PC");
+      }
+      controller_disconnected = true;
+      device_physically_connected = false;
+      
+      reset_controller_state();
+      pixels.setPixelColor(0, pixels.Color(0, 0, 15)); pixels.show(); // 待機状態に戻す
+    }
+  }
+}
+
 void setup() {}
 void loop() {}
 void setup1() {
+  // シリアル通信初期化
+  Serial.begin(115200);
+  while (!Serial && millis() < 3000); // 最大3秒待機
+  if (Serial && Serial.availableForWrite() > 0) {
+    Serial.println("[" + getTimeString() + "] System started - Waiting for Pro Controller...");
+  }
+  
   pixels.begin();
-  pixels.setPixelColor(0, pixels.Color(0, 0, 15)); pixels.show();
+  pixels.setPixelColor(0, pixels.Color(0, 0, 15)); pixels.show(); // 待機中は青
   delay(500);
   
   // SPI初期化
@@ -201,4 +388,14 @@ void setup1() {
   USBHost.configure_pio_usb(1, &pio_cfg);
   USBHost.begin(1);
 }
-void loop1() { USBHost.task(); }
+void loop1() { 
+  USBHost.task();
+  
+  // 切断状態の場合は処理を停止
+  if (controller_disconnected) {
+    return;
+  }
+  
+  // 正常時は接続状態をチェック
+  check_connection_status();
+}
