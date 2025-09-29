@@ -20,6 +20,55 @@ Pro Controller → RP2350 → ATMega32U4 → PC (Windows GUI)
 - **RP2350**: Pro ControllerからUSB HIDデータを受信
 - **ATMega32U4**: RP2350からSPI経由でデータを受信し、Nintendo SwitchへのHID出力とPCへのシリアル通信を同時実行
 
+## 配線
+
+### RP2350 ↔ ATMega32U4 SPI接続
+
+| RP2350 | ATMega32U4 | 信号名 | 説明 |
+|--------|------------|--------|------|
+| Pin 1  | Pin 7      | CS     | チップセレクト |
+| Pin 2  | Pin 15     | SCK    | シリアルクロック |
+| Pin 3  | Pin 16     | MOSI   | マスター出力/スレーブ入力 |
+| Pin 0  | Pin 14     | MISO   | マスター入力/スレーブ出力（未使用） |
+| GND    | GND        | GND    | グラウンド |
+
+### 接続例
+```
+[RP2350]          [ATMega32U4]
+Pin 1 (CS)   ---→ Pin 7 (SS)
+Pin 2 (SCK)  ---→ Pin 15 (SCK)
+Pin 3 (MOSI) ---→ Pin 16 (MOSI)
+Pin 0 (MISO) ←--- Pin 14 (MISO) ※未使用
+GND          ---  GND
+```
+
+**注意**：
+- SPI通信速度は10kHzに設定
+- RP2350がマスター、ATMega32U4がスレーブ
+- MISOラインは現在未使用（将来の拡張用）
+
+### ATMega32U4 ↔ PC シリアル接続
+
+| ATMega32U4 | PC (USB-シリアル変換) | 信号名 | 説明 |
+|------------|---------------------|--------|------|
+| Pin 0 (TX) | RX                  | TX     | ATMega32U4からPC への送信 |
+| Pin 1 (RX) | TX                  | RX     | PCからATMega32U4への受信 |
+| GND        | GND                 | GND    | グラウンド |
+
+### 接続例
+```
+[ATMega32U4]     [USB-シリアル変換器]     [PC]
+Pin 0 (TX)  ---→ RX                 ╱---→ USB
+Pin 1 (RX)  ←--- TX                ╱
+GND         ---  GND              ╱
+                                 USB
+```
+
+**注意**：
+- シリアル通信速度は115200bpsに設定
+- COBS（Consistent Overhead Byte Stuffing）エンコーディングを使用
+- CRC8によるデータ整合性チェック
+
 ### ソフトウェア
 - **ProConVisualizer**: Windows GUI アプリケーション（wxWidgets使用）
 - コントローラーの状態をリアルタイムで視覚的に表示

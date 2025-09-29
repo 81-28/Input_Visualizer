@@ -6,7 +6,10 @@
 // ================================================================
 // SPI通信設定
 // ================================================================
-#define SPI_CS_PIN 1    // CS to ATMega32u4 Pin 7
+#define SPI_CS_PIN 1    // CS signal to ATMega32U4 Pin 7
+#define SPI_SCK_PIN 2   // SPI SCK  -> ATMega32U4 Pin 15
+#define SPI_MOSI_PIN 3  // SPI MOSI -> ATMega32U4 Pin 16
+#define SPI_MISO_PIN 0  // SPI MISO (unused)
 #define SPI_SPEED 10000 // 10kHz
 
 // ================================================================
@@ -376,9 +379,9 @@ void setup1() {
   delay(500);
   
   // SPI初期化
-  SPI.setSCK(2);
-  SPI.setTX(3);  
-  SPI.setRX(0);
+  SPI.setSCK(SPI_SCK_PIN);
+  SPI.setTX(SPI_MOSI_PIN);
+  SPI.setRX(SPI_MISO_PIN);
   SPI.begin();
   pinMode(SPI_CS_PIN, OUTPUT);
   digitalWrite(SPI_CS_PIN, HIGH);
