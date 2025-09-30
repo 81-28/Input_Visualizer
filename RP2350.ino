@@ -15,15 +15,14 @@
 // ================================================================
 // スティックキャリブレーション設定
 // ================================================================
-const int STICK_LX_MIN = 300, STICK_LX_NEUTRAL = 1841, STICK_LX_MAX = 3450;
-const int STICK_LY_MIN = 420, STICK_LY_NEUTRAL = 2055, STICK_LY_MAX = 3780;
-const int STICK_RX_MIN = 460, STICK_RX_NEUTRAL = 2075, STICK_RX_MAX = 3580;
-const int STICK_RY_MIN = 320, STICK_RY_NEUTRAL = 1877, STICK_RY_MAX = 3550;
+constexpr int STICK_LX_MIN = 300, STICK_LX_NEUTRAL = 1841, STICK_LX_MAX = 3450;
+constexpr int STICK_LY_MIN = 420, STICK_LY_NEUTRAL = 2055, STICK_LY_MAX = 3780;
+constexpr int STICK_RX_MIN = 460, STICK_RX_NEUTRAL = 2075, STICK_RX_MAX = 3580;
+constexpr int STICK_RY_MIN = 320, STICK_RY_NEUTRAL = 1877, STICK_RY_MAX = 3550;
 
 // スティックのデッドゾーン設定
 // ニュートラルを中心とした無反応範囲の半径をコントローラーの生の値(0-4095)で指定
-// この値を大きくするとデッドゾーンが広がり、小さくすると狭まります。
-const int STICK_DEADZONE_RADIUS = 150;
+constexpr int STICK_DEADZONE_RADIUS = 150;
 
 // ================================================================
 // 通信プロトコル定義
@@ -74,19 +73,20 @@ OutputReport out_report;
 // ================================================================
 // 接続監視用変数
 // ================================================================
-unsigned long last_data_time = 0;  // 最後にデータを受信した時刻
-const unsigned long CONNECTION_TIMEOUT = 3000;  // 3秒でタイムアウト
-bool connection_lost = false;
-unsigned long mount_time = 0;  // マウントされた時刻
-bool device_physically_connected = false;  // 物理的な接続状態
-int send_report_failures = 0;  // 送信失敗回数
-unsigned long last_mount_time = 0;  // 最後のマウント時刻
-unsigned long last_unmount_time = 0;  // 最後のアンマウント時刻
-int report_count = 0;  // 受信したレポート数
-bool debug_mode = false;  // デバッグモード（無効）
-int short_report_count = 0;  // 短いレポートの連続数
-const int SHORT_REPORT_THRESHOLD = 3;  // 3回連続で切断判定
-bool controller_disconnected = false;  // コントローラーが切断された状態
+// 接続時間ログ設定（分単位）
+constexpr unsigned long CONNECTION_LOG_INTERVAL_MINUTES = 15;  // ログ出力間隔（分）
+constexpr unsigned long CONNECTION_LOG_INTERVAL = CONNECTION_LOG_INTERVAL_MINUTES * 60 * 1000;  // ミリ秒に変換
+constexpr unsigned long CONNECTION_TIMEOUT = 3000;  // 3秒でタイムアウト
+constexpr int SHORT_REPORT_THRESHOLD = 3;  // 3回連続で切断判定
+constexpr int SEND_FAILURE_THRESHOLD = 3;  // 送信失敗閾値
+bool enable_connection_log = true;  // 接続時間ログの有効/無効
+
+unsigned long last_data_time = 0;
+bool device_physically_connected = false;
+int send_report_failures = 0;
+int short_report_count = 0;
+bool controller_disconnected = false;
+unsigned long last_connection_log_time = 0;
 
 // ================================================================
 // スティックの値変換関数 (デッドゾーン対応版)
@@ -114,7 +114,7 @@ void send_report(uint8_t size) {
   
   if (!success) {
     send_report_failures++;
-    if (send_report_failures > 3) {
+    if (send_report_failures > SEND_FAILURE_THRESHOLD) {
       if (Serial && Serial.availableForWrite() > 0) {
         Serial.println("[" + getTimeString() + "] Pro Controller disconnected (send failures)");
         Serial.println("To reconnect:");
@@ -180,10 +180,6 @@ String getTimeString() {
   return String(hours) + "h" + String(minutes) + "m" + String(seconds) + "s" + String(ms) + "ms";
 }
 
-
-
-
-
 // ================================================================
 // 状態リセット関数
 // ================================================================
@@ -194,11 +190,10 @@ void reset_controller_state() {
   init_state = InitState::HANDSHAKE;
   seq_counter = 0;
   last_data_time = 0;
-  connection_lost = false;
-  mount_time = 0;
   device_physically_connected = false;
   send_report_failures = 0;
   short_report_count = 0;
+  last_connection_log_time = 0;
 }
 
 uint8_t crc8(const uint8_t *data, int len) {
@@ -256,6 +251,7 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc, u
     init_state = InitState::HANDSHAKE;
     last_data_time = millis();
     device_physically_connected = true;
+    last_connection_log_time = millis();  // ログ時刻を初期化
     if (Serial && Serial.availableForWrite() > 0) {
       Serial.println("[" + getTimeString() + "] Pro Controller connected");
     }
@@ -296,7 +292,6 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
       // 正常なレポートを受信したらカウンタをリセット
       short_report_count = 0;
       last_data_time = millis();
-      connection_lost = false;
       
       if (init_state != InitState::DONE) {
         advance_init();
@@ -335,8 +330,16 @@ void check_connection_status() {
   if (is_procon && device_physically_connected) {
     unsigned long time_since_last_data = millis() - last_data_time;
     
+    // 定期的な接続状態ログ出力
+    if (enable_connection_log && (millis() - last_connection_log_time >= CONNECTION_LOG_INTERVAL)) {
+      if (Serial && Serial.availableForWrite() > 0) {
+        Serial.println("[" + getTimeString() + "] Pro Controller still connected");
+      }
+      last_connection_log_time = millis();
+    }
+    
     // 送信失敗が多い場合は即座に切断判定
-    if (send_report_failures > 3) {
+    if (send_report_failures > SEND_FAILURE_THRESHOLD) {
       if (Serial && Serial.availableForWrite() > 0) {
         Serial.println("[" + getTimeString() + "] *** TOO MANY SEND FAILURES - CONTROLLER DISCONNECTED ***");
       }
