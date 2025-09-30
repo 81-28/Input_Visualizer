@@ -1,21 +1,39 @@
+/*
+ * RP2350 Pro Controller Input Visualizer
+ * 
+ * Nintendo Switch Pro Controllerの入力を受信し、
+ * SPI経由でATMega32U4に送信するファームウェア
+ * 
+ * 機能:
+ * - Pro ControllerからのUSB HID入力受信
+ * - アナログスティックのキャリブレーション・デッドゾーン処理
+ * - SPI通信によるデータ転送
+ * - LCD表示による接続状態・経過時間表示
+ * - NeoPixel LEDによる視覚的状態表示
+ */
+
+// ================================================================
+// ライブラリインクルード
+// ================================================================
 #include "pio_usb.h"
 #include "Adafruit_TinyUSB.h"
 #include "tusb.h"
 #include <SPI.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include <Adafruit_NeoPixel.h>
 
 // ================================================================
-// SPI通信設定
+// ハードウェア設定: SPI通信
 // ================================================================
-#define SPI_CS_PIN 1    // CS signal to ATMega32U4 Pin 7
-#define SPI_SCK_PIN 2   // SPI SCK  -> ATMega32U4 Pin 15
-#define SPI_MOSI_PIN 3  // SPI MOSI -> ATMega32U4 Pin 16
-#define SPI_MISO_PIN 0  // SPI MISO (unused)
-#define SPI_SPEED 10000 // 10kHz
+#define SPI_CS_PIN   1      // CS signal to ATMega32U4 Pin 7
+#define SPI_SCK_PIN  2      // SPI SCK  -> ATMega32U4 Pin 15
+#define SPI_MOSI_PIN 3      // SPI MOSI -> ATMega32U4 Pin 16
+#define SPI_MISO_PIN 0      // SPI MISO (unused)
+#define SPI_SPEED    10000  // 10kHz
 
 // ================================================================
-// LCD設定
+// ハードウェア設定: LCD表示
 // ================================================================
 #define LCD_ADDRESS 0x27
 #define LCD_SDA_PIN 4
@@ -23,26 +41,52 @@
 LiquidCrystal_I2C lcd(LCD_ADDRESS, 16, 2);
 
 // ================================================================
-// スティックキャリブレーション設定
+// ハードウェア設定: USB Host & NeoPixel
 // ================================================================
-constexpr int STICK_LX_MIN = 300, STICK_LX_NEUTRAL = 1841, STICK_LX_MAX = 3450;
-constexpr int STICK_LY_MIN = 420, STICK_LY_NEUTRAL = 2055, STICK_LY_MAX = 3780;
-constexpr int STICK_RX_MIN = 460, STICK_RX_NEUTRAL = 2075, STICK_RX_MAX = 3580;
-constexpr int STICK_RY_MIN = 320, STICK_RY_NEUTRAL = 1877, STICK_RY_MAX = 3550;
+#define HOST_PIN_DP  12
+#define DIN_PIN      16
+Adafruit_USBH_Host USBHost;
+Adafruit_NeoPixel pixels(1, DIN_PIN, NEO_RGB + NEO_KHZ800);
 
-// スティックのデッドゾーン設定
-// ニュートラルを中心とした無反応範囲の半径をコントローラーの生の値(0-4095)で指定
+// ================================================================
+// 定数定義: Nintendo Pro Controller
+// ================================================================
+#define VID_NINTENDO   0x057e
+#define PID_SWITCH_PRO 0x2009
+
+// ================================================================
+// 定数定義: スティックキャリブレーション
+// ================================================================
+// 各軸の最小値・ニュートラル・最大値
+constexpr int STICK_LX_MIN = 300,  STICK_LX_NEUTRAL = 1841, STICK_LX_MAX = 3450;
+constexpr int STICK_LY_MIN = 420,  STICK_LY_NEUTRAL = 2055, STICK_LY_MAX = 3780;
+constexpr int STICK_RX_MIN = 460,  STICK_RX_NEUTRAL = 2075, STICK_RX_MAX = 3580;
+constexpr int STICK_RY_MIN = 320,  STICK_RY_NEUTRAL = 1877, STICK_RY_MAX = 3550;
+
+// デッドゾーン設定（ニュートラルを中心とした無反応範囲の半径）
 constexpr int STICK_DEADZONE_RADIUS = 150;
 
 // ================================================================
-// 通信プロトコル定義
+// 定数定義: 接続監視
 // ================================================================
+constexpr unsigned long CONNECTION_LOG_INTERVAL_MINUTES = 15;  // ログ出力間隔（分）
+constexpr unsigned long CONNECTION_LOG_INTERVAL = CONNECTION_LOG_INTERVAL_MINUTES * 60 * 1000;  // ミリ秒変換
+constexpr unsigned long CONNECTION_TIMEOUT = 3000;            // 3秒でタイムアウト
+constexpr int SHORT_REPORT_THRESHOLD = 3;                     // 3回連続で切断判定
+constexpr int SEND_FAILURE_THRESHOLD = 3;                     // 送信失敗閾値
+
+// ================================================================
+// データ構造定義: 通信プロトコル
+// ================================================================
+// コントローラーデータ構造体
 struct ControllerData {
   uint16_t buttons;
   uint8_t dpad;
   uint8_t stick_lx, stick_ly, stick_rx, stick_ry;
   uint8_t crc;
 };
+
+// ボタンビットマスク定義
 #define BTN_A       (1 << 0)
 #define BTN_B       (1 << 1)
 #define BTN_X       (1 << 2)
@@ -57,68 +101,199 @@ struct ControllerData {
 #define BTN_R_STICK (1 << 11)
 #define BTN_HOME    (1 << 12)
 #define BTN_CAPTURE (1 << 13)
-#define DPAD_UP    (1 << 0)
-#define DPAD_DOWN  (1 << 1)
-#define DPAD_LEFT  (1 << 2)
-#define DPAD_RIGHT (1 << 3)
+
+// D-Padビットマスク定義
+#define DPAD_UP     (1 << 0)
+#define DPAD_DOWN   (1 << 1)
+#define DPAD_LEFT   (1 << 2)
+#define DPAD_RIGHT  (1 << 3)
+
+// Pro Controller出力レポート構造体
+struct OutputReport { 
+  uint8_t command, sequence_counter, rumble_l[4], rumble_r[4], sub_command, sub_command_args[8]; 
+};
 
 // ================================================================
-// Proコントローラーの定義と初期化
+// グローバル変数: Pro Controller制御
 // ================================================================
-#define HOST_PIN_DP 12
-Adafruit_USBH_Host USBHost;
-#include <Adafruit_NeoPixel.h>
-#define DIN_PIN 16
-Adafruit_NeoPixel pixels(1, DIN_PIN, NEO_RGB + NEO_KHZ800);
-#define VID_NINTENDO 0x057e
-#define PID_SWITCH_PRO 0x2009
-
 enum class InitState { HANDSHAKE, DISABLE_TIMEOUT, LED, LED_HOME, FULL_REPORT, DONE };
+
 InitState init_state = InitState::HANDSHAKE;
-uint8_t procon_addr = 0, procon_instance = 0, seq_counter = 0;
-bool is_procon = false;
-struct OutputReport { uint8_t command, sequence_counter, rumble_l[4], rumble_r[4], sub_command, sub_command_args[8]; };
 OutputReport out_report;
+uint8_t procon_addr = 0;
+uint8_t procon_instance = 0;
+uint8_t seq_counter = 0;
+bool is_procon = false;
 
 // ================================================================
-// 接続監視用変数
+// グローバル変数: 接続監視
 // ================================================================
-// 接続時間ログ設定（分単位）
-constexpr unsigned long CONNECTION_LOG_INTERVAL_MINUTES = 15;  // ログ出力間隔（分）
-constexpr unsigned long CONNECTION_LOG_INTERVAL = CONNECTION_LOG_INTERVAL_MINUTES * 60 * 1000;  // ミリ秒に変換
-constexpr unsigned long CONNECTION_TIMEOUT = 3000;  // 3秒でタイムアウト
-constexpr int SHORT_REPORT_THRESHOLD = 3;  // 3回連続で切断判定
-constexpr int SEND_FAILURE_THRESHOLD = 3;  // 送信失敗閾値
-bool enable_connection_log = true;  // 接続時間ログの有効/無効
-
-unsigned long last_data_time = 0;
-bool device_physically_connected = false;
-int send_report_failures = 0;
-int short_report_count = 0;
-bool controller_disconnected = false;
-unsigned long last_connection_log_time = 0;
-unsigned long connection_start_time = 0;  // 接続開始時刻
+bool enable_connection_log = true;               // 接続時間ログの有効/無効
+unsigned long last_data_time = 0;                // 最後にデータを受信した時刻
+unsigned long last_connection_log_time = 0;      // 最後にログを出力した時刻
+unsigned long connection_start_time = 0;         // 接続開始時刻
+bool device_physically_connected = false;        // 物理的接続状態
+bool controller_disconnected = false;            // 切断状態フラグ
+int send_report_failures = 0;                    // 送信失敗カウンタ
+int short_report_count = 0;                      // 短いレポート受信カウンタ
 
 // ================================================================
-// スティックの値変換関数 (デッドゾーン対応版)
+// ユーティリティ関数: 時刻・文字列処理
 // ================================================================
-uint8_t map_stick_axis(int value, int min_in, int neutral_in, int max_in, uint8_t newtral = 128) {
-  // 1. 値がデッドゾーンの範囲内かチェック
+
+/**
+ * 現在時刻を h:m:s:ms 形式の文字列で取得
+ */
+String getTimeString() {
+  unsigned long ms = millis();
+  unsigned long seconds = ms / 1000;
+  unsigned long minutes = seconds / 60;
+  unsigned long hours = minutes / 60;
+  
+  ms %= 1000;
+  seconds %= 60;
+  minutes %= 60;
+  
+  return String(hours) + "h" + String(minutes) + "m" + String(seconds) + "s" + String(ms) + "ms";
+}
+
+/**
+ * 経過時間を h:mm:ss.fff 形式の文字列で取得
+ */
+String getElapsedTimeString() {
+  unsigned long ms = millis();
+  unsigned long seconds = ms / 1000;
+  unsigned long minutes = seconds / 60;
+  unsigned long hours = minutes / 60;
+  
+  ms %= 1000;
+  seconds %= 60;
+  minutes %= 60;
+  
+  // h:mm:ss.fff 形式で構築
+  String result = String(hours) + ":";
+  
+  if (minutes < 10) result += "0";
+  result += String(minutes) + ":";
+  
+  if (seconds < 10) result += "0";
+  result += String(seconds) + ".";
+  
+  if (ms < 100) result += "0";
+  if (ms < 10) result += "0";
+  result += String(ms);
+  
+  return result;
+}
+
+/**
+ * CRC8チェックサム計算
+ */
+uint8_t crc8(const uint8_t *data, int len) {
+  uint8_t crc = 0;
+  while (len--) { 
+    crc ^= *data++; 
+    for (int i = 0; i < 8; i++) {
+      crc = crc & 0x80 ? (crc << 1) ^ 0x31 : crc << 1; 
+    }
+  }
+  return crc;
+}
+
+// ================================================================
+// ハードウェア制御: LCD表示
+// ================================================================
+
+/**
+ * LCD初期化
+ */
+void setupLCD() {
+  Wire.setSDA(LCD_SDA_PIN);
+  Wire.setSCL(LCD_SCL_PIN);
+  Wire.begin();
+  
+  lcd.init();
+  lcd.backlight();
+  
+  updateLCDDisplay("Starting...");
+}
+
+/**
+ * LCD表示更新
+ * 1行目: 経過時間（右詰め）
+ * 2行目: メッセージ（最大16文字）
+ */
+void updateLCDDisplay(String message) {
+  lcd.clear();
+  
+  // 1行目: 経過時間（右詰め）
+  String timeStr = getElapsedTimeString();
+  lcd.setCursor(16 - timeStr.length(), 0);
+  lcd.print(timeStr);
+  
+  // 2行目: メッセージ（最大16文字）
+  lcd.setCursor(0, 1);
+  if (message.length() > 16) {
+    lcd.print(message.substring(0, 16));
+  } else {
+    lcd.print(message);
+  }
+}
+
+// ================================================================
+// ハードウェア制御: SPI通信
+// ================================================================
+
+/**
+ * SPI経由でデータパケットを送信
+ */
+void send_spi_packet(const uint8_t *data, size_t length) {
+  SPI.beginTransaction(SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0));
+  digitalWrite(SPI_CS_PIN, LOW);
+  delayMicroseconds(100);
+  
+  for (size_t i = 0; i < length; i++) {
+    SPI.transfer(data[i]);
+    delayMicroseconds(10);
+  }
+  
+  delayMicroseconds(100);
+  digitalWrite(SPI_CS_PIN, HIGH);
+  SPI.endTransaction();
+}
+
+// ================================================================
+// コントローラー制御: スティック処理
+// ================================================================
+
+/**
+ * アナログスティック値の変換（デッドゾーン対応）
+ * 生の値をデッドゾーン処理後に0-255の範囲にマッピング
+ */
+uint8_t map_stick_axis(int value, int min_in, int neutral_in, int max_in, uint8_t neutral = 128) {
+  // 1. デッドゾーン範囲内かチェック
   if (abs(value - neutral_in) < STICK_DEADZONE_RADIUS) {
-    return newtral; // 範囲内ならニュートラルを返す
+    return neutral; // デッドゾーン内はニュートラル値を返す
   }
 
   // 2. デッドゾーン外の値をマッピング
   value = constrain(value, min_in, max_in);
   if (value < neutral_in) {
-    // 最小値から、デッドゾーンの手前までを 0-127 にマッピング
+    // 最小値からデッドゾーン手前までを 0-127 にマッピング
     return map(value, min_in, neutral_in - STICK_DEADZONE_RADIUS, 0, 127);
   } else {
-    // デッドゾーンの先から、最大値までを 129-255 にマッピング
+    // デッドゾーン先から最大値までを 129-255 にマッピング
     return map(value, neutral_in + STICK_DEADZONE_RADIUS, max_in, 129, 255);
   }
 }
 
+// ================================================================
+// コントローラー制御: Pro Controller通信
+// ================================================================
+
+/**
+ * Pro Controllerにレポートを送信
+ */
 void send_report(uint8_t size) {
   out_report.sequence_counter = seq_counter++ & 0x0F;
   bool success = tuh_hid_send_report(procon_addr, procon_instance, 0, (uint8_t*)&out_report, size);
@@ -136,121 +311,88 @@ void send_report(uint8_t size) {
       device_physically_connected = false;
     }
   } else {
-    send_report_failures = 0;  // 成功したらカウンタリセット
+    send_report_failures = 0;  // 成功時はカウンタリセット
   }
 }
 
+/**
+ * Pro Controller初期化シーケンスを進行
+ */
 void advance_init() {
   memset(&out_report, 0, sizeof(out_report));
   uint8_t report_size = 10;
-  out_report.rumble_l[0]=0; out_report.rumble_l[1]=1; out_report.rumble_l[2]=0x40; out_report.rumble_l[3]=0x40;
+  
+  // デフォルトランブル設定
+  out_report.rumble_l[0] = 0; 
+  out_report.rumble_l[1] = 1; 
+  out_report.rumble_l[2] = 0x40; 
+  out_report.rumble_l[3] = 0x40;
   memcpy(out_report.rumble_r, out_report.rumble_l, 4);
+  
   switch (init_state) {
     case InitState::HANDSHAKE:
-      report_size = 2; out_report.command = 0x80; out_report.sequence_counter = 0x02;
-      if (tuh_hid_send_report(procon_addr, procon_instance, 0, (uint8_t*)&out_report, report_size)) init_state = InitState::DISABLE_TIMEOUT;
+      report_size = 2; 
+      out_report.command = 0x80; 
+      out_report.sequence_counter = 0x02;
+      if (tuh_hid_send_report(procon_addr, procon_instance, 0, (uint8_t*)&out_report, report_size)) {
+        init_state = InitState::DISABLE_TIMEOUT;
+      }
       break;
+      
     case InitState::DISABLE_TIMEOUT:
-      report_size = 2; out_report.command = 0x80; out_report.sequence_counter = 0x04;
-      if (tuh_hid_send_report(procon_addr, procon_instance, 0, (uint8_t*)&out_report, report_size)) init_state = InitState::LED;
+      report_size = 2; 
+      out_report.command = 0x80; 
+      out_report.sequence_counter = 0x04;
+      if (tuh_hid_send_report(procon_addr, procon_instance, 0, (uint8_t*)&out_report, report_size)) {
+        init_state = InitState::LED;
+      }
       break;
+      
     case InitState::LED:
-      report_size = 12; out_report.command = 0x01; out_report.sub_command = 0x30; out_report.sub_command_args[0] = 0x01;
-      send_report(report_size); init_state = InitState::LED_HOME;
+      report_size = 12; 
+      out_report.command = 0x01; 
+      out_report.sub_command = 0x30; 
+      out_report.sub_command_args[0] = 0x01;
+      send_report(report_size); 
+      init_state = InitState::LED_HOME;
       break;
+      
     case InitState::LED_HOME:
-      report_size = 14; out_report.command = 0x01; out_report.sub_command = 0x38; out_report.sub_command_args[0] = 0x0F; out_report.sub_command_args[1] = 0xF0; out_report.sub_command_args[2] = 0xF0;
-      send_report(report_size); init_state = InitState::FULL_REPORT;
+      report_size = 14; 
+      out_report.command = 0x01; 
+      out_report.sub_command = 0x38; 
+      out_report.sub_command_args[0] = 0x0F; 
+      out_report.sub_command_args[1] = 0xF0; 
+      out_report.sub_command_args[2] = 0xF0;
+      send_report(report_size); 
+      init_state = InitState::FULL_REPORT;
       break;
+      
     case InitState::FULL_REPORT:
-      report_size = 12; out_report.command = 0x01; out_report.sub_command = 0x03; out_report.sub_command_args[0] = 0x30;
-      send_report(report_size); init_state = InitState::DONE;
+      report_size = 12; 
+      out_report.command = 0x01; 
+      out_report.sub_command = 0x03; 
+      out_report.sub_command_args[0] = 0x30;
+      send_report(report_size); 
+      init_state = InitState::DONE;
+      
+      // 初期化完了の表示
       updateLCDDisplay("Connected");
       if (Serial && Serial.availableForWrite() > 0) {
         Serial.println("[" + getTimeString() + "] Pro Controller initialization completed");
       }
-      pixels.setPixelColor(0, pixels.Color(0, 15, 0)); pixels.show();
+      pixels.setPixelColor(0, pixels.Color(0, 15, 0)); 
+      pixels.show();
       break;
-    default: break;
+      
+    default: 
+      break;
   }
 }
 
-// ================================================================
-// 時刻表示関数
-// ================================================================
-String getTimeString() {
-  unsigned long ms = millis();
-  unsigned long seconds = ms / 1000;
-  unsigned long minutes = seconds / 60;
-  unsigned long hours = minutes / 60;
-  
-  ms %= 1000;
-  seconds %= 60;
-  minutes %= 60;
-  
-  return String(hours) + "h" + String(minutes) + "m" + String(seconds) + "s" + String(ms) + "ms";
-}
-
-// ================================================================
-// LCD表示関数
-// ================================================================
-String getElapsedTimeString() {
-  unsigned long ms = millis();
-  unsigned long seconds = ms / 1000;
-  unsigned long minutes = seconds / 60;
-  unsigned long hours = minutes / 60;
-  
-  ms %= 1000;
-  seconds %= 60;
-  minutes %= 60;
-  
-  // 0:00:00.000 形式
-  String result = String(hours) + ":";
-  
-  if (minutes < 10) result += "0";
-  result += String(minutes) + ":";
-  
-  if (seconds < 10) result += "0";
-  result += String(seconds) + ".";
-  
-  if (ms < 100) result += "0";
-  if (ms < 10) result += "0";
-  result += String(ms);
-  
-  return result;
-}
-
-void updateLCDDisplay(String message) {
-  lcd.clear();
-  
-  // 1行目: 経過時間（右詰め）
-  String timeStr = getElapsedTimeString();
-  lcd.setCursor(16 - timeStr.length(), 0);  // 右詰めで表示
-  lcd.print(timeStr);
-  
-  // 2行目: メッセージ(最大16文字)
-  lcd.setCursor(0, 1);
-  if (message.length() > 16) {
-    lcd.print(message.substring(0, 16));
-  } else {
-    lcd.print(message);
-  }
-}
-
-void setupLCD() {
-  Wire.setSDA(LCD_SDA_PIN);
-  Wire.setSCL(LCD_SCL_PIN);
-  Wire.begin();
-  
-  lcd.init();
-  lcd.backlight();
-  
-  updateLCDDisplay("Starting...");
-}
-
-// ================================================================
-// 状態リセット関数
-// ================================================================
+/**
+ * コントローラー状態をリセット
+ */
 void reset_controller_state() {
   is_procon = false;
   procon_addr = 0;
@@ -268,43 +410,74 @@ void reset_controller_state() {
   updateLCDDisplay("Waiting ProCon");
 }
 
-uint8_t crc8(const uint8_t *data, int len) {
-  uint8_t crc = 0;
-  while (len--) { crc ^= *data++; for (int i = 0; i < 8; i++) crc = crc & 0x80 ? (crc << 1) ^ 0x31 : crc << 1; }
-  return crc;
-}
+// ================================================================
+// データ処理: コントローラーレポート処理
+// ================================================================
 
-void send_spi_packet(const uint8_t *data, size_t length) {
-  SPI.beginTransaction(SPISettings(SPI_SPEED, MSBFIRST, SPI_MODE0));
-  digitalWrite(SPI_CS_PIN, LOW);
-  delayMicroseconds(100);
-  
-  for (size_t i = 0; i < length; i++) {
-    SPI.transfer(data[i]);
-    delayMicroseconds(10);
-  }
-  
-  delayMicroseconds(100);
-  digitalWrite(SPI_CS_PIN, HIGH);
-  SPI.endTransaction();
-}
-
+/**
+ * Pro Controllerからのレポートを処理してSPI送信
+ */
 void process_and_send_report(uint8_t const* report) {
   ControllerData data;
-  uint8_t r = report[3], m = report[4], l = report[5];
-  data.buttons=0; if(r&1)data.buttons|=BTN_Y; if(r&2)data.buttons|=BTN_X; if(r&4)data.buttons|=BTN_B; if(r&8)data.buttons|=BTN_A; if(r&0x40)data.buttons|=BTN_R; if(r&0x80)data.buttons|=BTN_ZR; if(l&0x40)data.buttons|=BTN_L; if(l&0x80)data.buttons|=BTN_ZL; if(m&1)data.buttons|=BTN_MINUS; if(m&2)data.buttons|=BTN_PLUS; if(m&4)data.buttons|=BTN_R_STICK; if(m&8)data.buttons|=BTN_L_STICK; if(m&0x10)data.buttons|=BTN_HOME; if(m&0x20)data.buttons|=BTN_CAPTURE;
-  data.dpad=0; if(l&1)data.dpad|=DPAD_DOWN; if(l&2)data.dpad|=DPAD_UP; if(l&4)data.dpad|=DPAD_RIGHT; if(l&8)data.dpad|=DPAD_LEFT;
   
-  data.stick_lx = map_stick_axis(report[6]|((report[7]&0xF)<<8), STICK_LX_MIN, STICK_LX_NEUTRAL, STICK_LX_MAX);
-  data.stick_ly = 255 - map_stick_axis((report[7]>>4)|(report[8]<<4), STICK_LY_MIN, STICK_LY_NEUTRAL, STICK_LY_MAX, 127);
-  data.stick_rx = map_stick_axis(report[9]|((report[10]&0xF)<<8), STICK_RX_MIN, STICK_RX_NEUTRAL, STICK_RX_MAX);
-  data.stick_ry = 255 - map_stick_axis((report[10]>>4)|(report[11]<<4), STICK_RY_MIN, STICK_RY_NEUTRAL, STICK_RY_MAX, 127);
+  // Pro Controllerレポートからボタン状態を抽出
+  uint8_t r = report[3], m = report[4], l = report[5];
+  
+  // ボタン状態をビットマスクに変換
+  data.buttons = 0;
+  if (r & 1)    data.buttons |= BTN_Y;
+  if (r & 2)    data.buttons |= BTN_X;
+  if (r & 4)    data.buttons |= BTN_B;
+  if (r & 8)    data.buttons |= BTN_A;
+  if (r & 0x40) data.buttons |= BTN_R;
+  if (r & 0x80) data.buttons |= BTN_ZR;
+  if (l & 0x40) data.buttons |= BTN_L;
+  if (l & 0x80) data.buttons |= BTN_ZL;
+  if (m & 1)    data.buttons |= BTN_MINUS;
+  if (m & 2)    data.buttons |= BTN_PLUS;
+  if (m & 4)    data.buttons |= BTN_R_STICK;
+  if (m & 8)    data.buttons |= BTN_L_STICK;
+  if (m & 0x10) data.buttons |= BTN_HOME;
+  if (m & 0x20) data.buttons |= BTN_CAPTURE;
+  
+  // D-Pad状態をビットマスクに変換
+  data.dpad = 0;
+  if (l & 1) data.dpad |= DPAD_DOWN;
+  if (l & 2) data.dpad |= DPAD_UP;
+  if (l & 4) data.dpad |= DPAD_RIGHT;
+  if (l & 8) data.dpad |= DPAD_LEFT;
+  
+  // アナログスティック値を変換（キャリブレーション+デッドゾーン処理）
+  data.stick_lx = map_stick_axis(
+    report[6] | ((report[7] & 0xF) << 8), 
+    STICK_LX_MIN, STICK_LX_NEUTRAL, STICK_LX_MAX
+  );
+  data.stick_ly = 255 - map_stick_axis(
+    (report[7] >> 4) | (report[8] << 4), 
+    STICK_LY_MIN, STICK_LY_NEUTRAL, STICK_LY_MAX, 127
+  );
+  data.stick_rx = map_stick_axis(
+    report[9] | ((report[10] & 0xF) << 8), 
+    STICK_RX_MIN, STICK_RX_NEUTRAL, STICK_RX_MAX
+  );
+  data.stick_ry = 255 - map_stick_axis(
+    (report[10] >> 4) | (report[11] << 4), 
+    STICK_RY_MIN, STICK_RY_NEUTRAL, STICK_RY_MAX, 127
+  );
 
+  // CRCを計算してSPI送信
   data.crc = 0;
   data.crc = crc8((uint8_t*)&data, sizeof(data));
   send_spi_packet((uint8_t*)&data, sizeof(data));
 }
 
+// ================================================================
+// USB Host コールバック関数
+// ================================================================
+
+/**
+ * USB HIDデバイス接続時のコールバック
+ */
 void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc, uint16_t len) {
   uint16_t vid, pid;
   tuh_vid_pid_get(dev_addr, &vid, &pid);
@@ -319,24 +492,33 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc, u
       return;
     }
     
-    procon_addr = dev_addr; procon_instance = instance; is_procon = true;
+    // Pro Controller接続処理
+    procon_addr = dev_addr; 
+    procon_instance = instance; 
+    is_procon = true;
     init_state = InitState::HANDSHAKE;
     last_data_time = millis();
     device_physically_connected = true;
-    connection_start_time = millis();  // 接続開始時刻を記録
+    connection_start_time = millis();
     last_connection_log_time = millis();
     
-    // LCD表示更新
+    // 状態表示更新
     updateLCDDisplay("Connecting...");
     if (Serial && Serial.availableForWrite() > 0) {
       Serial.println("[" + getTimeString() + "] Pro Controller connected");
     }
-    pixels.setPixelColor(0, pixels.Color(15, 15, 0)); pixels.show();
+    pixels.setPixelColor(0, pixels.Color(15, 15, 0)); // 黄色: 接続中
+    pixels.show();
+    
     advance_init();
   }
   
   tuh_hid_receive_report(dev_addr, instance);
 }
+
+/**
+ * USB HIDレポート受信時のコールバック
+ */
 void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* report, uint16_t len) {
   // 切断状態の場合は処理を停止
   if (controller_disconnected) {
@@ -345,7 +527,7 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
   }
   
   if (is_procon && dev_addr == procon_addr) {
-    // レポートの長さで切断を判定
+    // レポート長で切断を判定
     if (len < 12) {  // 正常なプロコンレポートは12バイト以上
       short_report_count++;
       
@@ -361,10 +543,11 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
         device_physically_connected = false;
         is_procon = false;
         
-        // LCD表示更新
+        // 状態表示更新
         updateLCDDisplay("Disconnected");
+        pixels.setPixelColor(0, pixels.Color(15, 0, 0)); // 赤色: 切断
+        pixels.show();
         
-        pixels.setPixelColor(0, pixels.Color(15, 0, 0)); pixels.show();
         tuh_hid_receive_report(dev_addr, instance);
         return;
       }
@@ -382,6 +565,10 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
   }
   tuh_hid_receive_report(dev_addr, instance);
 }
+
+/**
+ * USB HIDデバイス切断時のコールバック
+ */
 void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
   if (dev_addr == procon_addr) {
     if (Serial && Serial.availableForWrite() > 0) {
@@ -394,15 +581,19 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
     device_physically_connected = false;
     is_procon = false;
     
-    // LCD表示更新
+    // 状態表示更新
     updateLCDDisplay("Disconnected");
-    
-    pixels.setPixelColor(0, pixels.Color(15, 0, 0)); pixels.show();
+    pixels.setPixelColor(0, pixels.Color(15, 0, 0)); // 赤色: 切断
+    pixels.show();
   }
 }
 // ================================================================
-// 接続状態チェック関数
+// システム監視: 接続状態チェック
 // ================================================================
+
+/**
+ * 接続状態の定期チェックと状態表示更新
+ */
 void check_connection_status() {
   static unsigned long last_check = 0;
   static bool timeout_reported = false;
@@ -420,15 +611,15 @@ void check_connection_status() {
         Serial.println("[" + getTimeString() + "] Pro Controller still connected");
       }
       
-      // LCD表示更新
+      // LCD表示更新（接続時間表示）
       unsigned long conn_minutes = (millis() - connection_start_time) / 60000;
       unsigned long conn_hours = conn_minutes / 60;
       conn_minutes = conn_minutes % 60;
-      if (conn_minutes < 10) {
-        updateLCDDisplay(String(conn_hours) + " h 0" + String(conn_minutes) + " m");
-      } else {
-        updateLCDDisplay(String(conn_hours) + " h " + String(conn_minutes) + " m");
-      }
+      
+      String timeDisplay = String(conn_hours) + " h ";
+      if (conn_minutes < 10) timeDisplay += "0";
+      timeDisplay += String(conn_minutes) + " m";
+      updateLCDDisplay(timeDisplay);
 
       last_connection_log_time = millis();
     }
@@ -440,7 +631,8 @@ void check_connection_status() {
       }
       device_physically_connected = false;
       reset_controller_state();
-      pixels.setPixelColor(0, pixels.Color(15, 0, 0)); pixels.show();
+      pixels.setPixelColor(0, pixels.Color(15, 0, 0)); // 赤色: エラー
+      pixels.show();
       return;
     }
     
@@ -457,13 +649,33 @@ void check_connection_status() {
       device_physically_connected = false;
       
       reset_controller_state();
-      pixels.setPixelColor(0, pixels.Color(0, 0, 15)); pixels.show(); // 待機状態に戻す
+      pixels.setPixelColor(0, pixels.Color(0, 0, 15)); // 青色: 待機状態
+      pixels.show();
     }
   }
 }
 
-void setup() {}
-void loop() {}
+// ================================================================
+// メイン関数: システム初期化・メインループ
+// ================================================================
+
+/**
+ * Core0 初期化（空実装）
+ */
+void setup() {
+  // Core0は使用しない
+}
+
+/**
+ * Core0 メインループ（空実装）
+ */
+void loop() {
+  // Core0は使用しない
+}
+
+/**
+ * Core1 初期化
+ */
 void setup1() {
   // LCD初期化
   setupLCD();
@@ -475,8 +687,10 @@ void setup1() {
     Serial.println("[" + getTimeString() + "] System started - Waiting for Pro Controller...");
   }
   
+  // NeoPixel初期化
   pixels.begin();
-  pixels.setPixelColor(0, pixels.Color(0, 0, 15)); pixels.show(); // 待機中は青
+  pixels.setPixelColor(0, pixels.Color(0, 0, 15)); // 青色: 待機中
+  pixels.show();
   delay(500);
   
   // SPI初期化
@@ -487,15 +701,21 @@ void setup1() {
   pinMode(SPI_CS_PIN, OUTPUT);
   digitalWrite(SPI_CS_PIN, HIGH);
   
+  // USB Host初期化
   pio_usb_configuration_t pio_cfg = PIO_USB_DEFAULT_CONFIG;
   pio_cfg.pin_dp = HOST_PIN_DP;
   USBHost.configure_pio_usb(1, &pio_cfg);
   USBHost.begin(1);
 }
+
+/**
+ * Core1 メインループ
+ */
 void loop1() { 
+  // USB Host処理
   USBHost.task();
   
-  // 切断状態の場合は処理を停止
+  // 切断状態の場合は監視処理をスキップ
   if (controller_disconnected) {
     return;
   }
