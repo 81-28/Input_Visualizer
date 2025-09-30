@@ -2,6 +2,8 @@
 #include "Adafruit_TinyUSB.h"
 #include "tusb.h"
 #include <SPI.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 
 // ================================================================
 // SPI通信設定
@@ -11,6 +13,14 @@
 #define SPI_MOSI_PIN 3  // SPI MOSI -> ATMega32U4 Pin 16
 #define SPI_MISO_PIN 0  // SPI MISO (unused)
 #define SPI_SPEED 10000 // 10kHz
+
+// ================================================================
+// LCD設定
+// ================================================================
+#define LCD_ADDRESS 0x27
+#define LCD_SDA_PIN 4
+#define LCD_SCL_PIN 5
+LiquidCrystal_I2C lcd(LCD_ADDRESS, 16, 2);
 
 // ================================================================
 // スティックキャリブレーション設定
@@ -87,6 +97,7 @@ int send_report_failures = 0;
 int short_report_count = 0;
 bool controller_disconnected = false;
 unsigned long last_connection_log_time = 0;
+unsigned long connection_start_time = 0;  // 接続開始時刻
 
 // ================================================================
 // スティックの値変換関数 (デッドゾーン対応版)
@@ -154,6 +165,7 @@ void advance_init() {
     case InitState::FULL_REPORT:
       report_size = 12; out_report.command = 0x01; out_report.sub_command = 0x03; out_report.sub_command_args[0] = 0x30;
       send_report(report_size); init_state = InitState::DONE;
+      updateLCDDisplay("Connected");
       if (Serial && Serial.availableForWrite() > 0) {
         Serial.println("[" + getTimeString() + "] Pro Controller initialization completed");
       }
@@ -175,9 +187,65 @@ String getTimeString() {
   ms %= 1000;
   seconds %= 60;
   minutes %= 60;
-  hours %= 24;
   
   return String(hours) + "h" + String(minutes) + "m" + String(seconds) + "s" + String(ms) + "ms";
+}
+
+// ================================================================
+// LCD表示関数
+// ================================================================
+String getElapsedTimeString() {
+  unsigned long ms = millis();
+  unsigned long seconds = ms / 1000;
+  unsigned long minutes = seconds / 60;
+  unsigned long hours = minutes / 60;
+  
+  ms %= 1000;
+  seconds %= 60;
+  minutes %= 60;
+  
+  // 0:00:00.000 形式
+  String result = String(hours) + ":";
+  
+  if (minutes < 10) result += "0";
+  result += String(minutes) + ":";
+  
+  if (seconds < 10) result += "0";
+  result += String(seconds) + ".";
+  
+  if (ms < 100) result += "0";
+  if (ms < 10) result += "0";
+  result += String(ms);
+  
+  return result;
+}
+
+void updateLCDDisplay(String message) {
+  lcd.clear();
+  
+  // 1行目: 経過時間（右詰め）
+  String timeStr = getElapsedTimeString();
+  lcd.setCursor(16 - timeStr.length(), 0);  // 右詰めで表示
+  lcd.print(timeStr);
+  
+  // 2行目: メッセージ(最大16文字)
+  lcd.setCursor(0, 1);
+  if (message.length() > 16) {
+    lcd.print(message.substring(0, 16));
+  } else {
+    lcd.print(message);
+  }
+}
+
+void setupLCD() {
+  Wire.setSDA(LCD_SDA_PIN);
+  Wire.setSCL(LCD_SCL_PIN);
+  Wire.begin();
+  
+  lcd.init();
+  lcd.backlight();
+  
+  updateLCDDisplay("Starting...");
 }
 
 // ================================================================
@@ -194,6 +262,10 @@ void reset_controller_state() {
   send_report_failures = 0;
   short_report_count = 0;
   last_connection_log_time = 0;
+  connection_start_time = 0;
+  
+  // LCD表示をリセット
+  updateLCDDisplay("Waiting ProCon");
 }
 
 uint8_t crc8(const uint8_t *data, int len) {
@@ -251,7 +323,11 @@ void tuh_hid_mount_cb(uint8_t dev_addr, uint8_t instance, uint8_t const* desc, u
     init_state = InitState::HANDSHAKE;
     last_data_time = millis();
     device_physically_connected = true;
-    last_connection_log_time = millis();  // ログ時刻を初期化
+    connection_start_time = millis();  // 接続開始時刻を記録
+    last_connection_log_time = millis();
+    
+    // LCD表示更新
+    updateLCDDisplay("Connecting...");
     if (Serial && Serial.availableForWrite() > 0) {
       Serial.println("[" + getTimeString() + "] Pro Controller connected");
     }
@@ -284,6 +360,10 @@ void tuh_hid_report_received_cb(uint8_t dev_addr, uint8_t instance, uint8_t cons
         controller_disconnected = true;
         device_physically_connected = false;
         is_procon = false;
+        
+        // LCD表示更新
+        updateLCDDisplay("Disconnected");
+        
         pixels.setPixelColor(0, pixels.Color(15, 0, 0)); pixels.show();
         tuh_hid_receive_report(dev_addr, instance);
         return;
@@ -313,6 +393,10 @@ void tuh_hid_umount_cb(uint8_t dev_addr, uint8_t instance) {
     controller_disconnected = true;
     device_physically_connected = false;
     is_procon = false;
+    
+    // LCD表示更新
+    updateLCDDisplay("Disconnected");
+    
     pixels.setPixelColor(0, pixels.Color(15, 0, 0)); pixels.show();
   }
 }
@@ -335,6 +419,17 @@ void check_connection_status() {
       if (Serial && Serial.availableForWrite() > 0) {
         Serial.println("[" + getTimeString() + "] Pro Controller still connected");
       }
+      
+      // LCD表示更新
+      unsigned long conn_minutes = (millis() - connection_start_time) / 60000;
+      unsigned long conn_hours = conn_minutes / 60;
+      conn_minutes = conn_minutes % 60;
+      if (conn_minutes < 10) {
+        updateLCDDisplay(String(conn_hours) + " h 0" + String(conn_minutes) + " m");
+      } else {
+        updateLCDDisplay(String(conn_hours) + " h " + String(conn_minutes) + " m");
+      }
+
       last_connection_log_time = millis();
     }
     
@@ -370,6 +465,9 @@ void check_connection_status() {
 void setup() {}
 void loop() {}
 void setup1() {
+  // LCD初期化
+  setupLCD();
+  
   // シリアル通信初期化
   Serial.begin(115200);
   while (!Serial && millis() < 3000); // 最大3秒待機

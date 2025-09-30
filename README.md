@@ -19,6 +19,7 @@ Pro Controller → RP2350 → ATMega32U4 → PC (Windows GUI)
 ### ハードウェア
 - **RP2350**: Pro ControllerからUSB HIDデータを受信
 - **ATMega32U4**: RP2350からSPI経由でデータを受信し、Nintendo SwitchへのHID出力とPCへのシリアル通信を同時実行
+- **1602 LCD (I2C)**: 接続状態と経過時間をオフラインで表示
 
 ## 配線
 
@@ -69,6 +70,30 @@ GND         ---  GND              ╱
 - COBS（Consistent Overhead Byte Stuffing）エンコーディングを使用
 - CRC8によるデータ整合性チェック
 
+### RP2350 ↔ LCD (I2C) 接続
+
+| RP2350 | 1602 LCD (I2C) | 信号名 | 説明 |
+|--------|----------------|--------|------|
+| Pin 4  | SDA            | SDA    | I2Cデータライン |
+| Pin 5  | SCL            | SCL    | I2Cクロックライン |
+| 5V     | VCC            | VCC    | 電源 |
+| GND    | GND            | GND    | グラウンド |
+
+### 接続例
+```
+[RP2350]          [1602 LCD (I2C)]
+Pin 4 (SDA) ---→ SDA
+Pin 5 (SCL) ---→ SCL
+5V          ---→ VCC
+GND         ---  GND
+```
+
+**注意**：
+- LCDのI2Cアドレスは0x27（一般的な設定）
+- PCに接続されていない場合でもLCDで状態確認可能
+- 1行目: 経過時間（右詰め、h:mm:ss.fff形式）
+- 2行目: 接続状態メッセージ
+
 ### ソフトウェア
 - **ProConVisualizer**: Windows GUI アプリケーション（wxWidgets使用）
 - コントローラーの状態をリアルタイムで視覚的に表示
@@ -115,10 +140,19 @@ GND         ---  GND              ╱
 - 🟢 **緑色**: Pro Controller接続完了
 - 🔴 **赤色**: Pro Controller切断
 
+### LCD表示機能
+- **1行目**: 経過時間（右詰め表示、h:mm:ss.fff形式）
+- **2行目**: 接続状態メッセージ
+  - "Waiting ProCon" - Pro Controller待機中
+  - "Connecting..." - 接続中
+  - "Connected" - 接続完了
+  - "Disconnected" - 切断
+
 ### 使い方
-- **USB電源のみ**: LEDで接続状態を確認
+- **USB電源のみ**: LED + LCDで接続状態と経過時間を確認
 - **PC接続時**: シリアルモニタで、接続/切断ログも確認可能
 - **切断時**: Pro Controller再接続 → PC/電源再接続で復旧
+- **オフライン監視**: PCに接続せずともLCDで状態確認が可能
 
 ## フルシステム（可視化）のビルド・実行
 
