@@ -8,6 +8,9 @@
 #include <vector>
 #include <windows.h>
 
+// カスタムイベント：再生完了通知
+wxDECLARE_EVENT(wxEVT_PLAYBACK_COMPLETED, wxCommandEvent);
+
 // RP2350.inoからのControllerData構造体
 struct ControllerData {
     uint16_t buttons;
@@ -37,6 +40,26 @@ struct ControllerData {
 #define DPAD_LEFT  (1 << 2)
 #define DPAD_RIGHT (1 << 3)
 
+// 動作モード定義
+enum OperationMode {
+    MODE_PASSTHROUGH = 0,  // パススルーモード（通常動作）
+    MODE_RECORDING = 1,    // 記録モード
+    MODE_PLAYBACK = 2      // 再生モード
+};
+
+// プロトコル定義（簡素化版）
+#define CMD_PLAYBACK_START 0xA0
+#define CMD_PLAYBACK_DATA 0xA1
+#define CMD_PLAYBACK_STOP 0xA2
+#define CMD_PRELOAD_FRAME 0xA3        // プリロード専用コマンド
+#define CMD_DATA_PACKET 0xB0        // ATmega32U4からのデータ受信
+
+// タイムスタンプ付きデータ構造
+struct TimestampedData {
+    uint32_t timestamp;  // ミリ秒単位のタイムスタンプ
+    ControllerData data;
+};
+
 class ControllerPanel : public wxPanel
 {
 public:
@@ -46,6 +69,19 @@ public:
     bool ConnectSerial(const wxString& portName);
     void DisconnectSerial();
     bool IsConnected() const { return connected; }
+    
+    // 記録・再生機能
+    void StartRecording();
+    void StopRecording();
+    void StartPlayback(const wxString& filename);
+    void StopPlayback();
+    bool IsRecording() const { return recording; }
+    bool IsPlayingBack() const { return playback_active; }
+    bool IsWaitingForRecordingTrigger() const { return recording_waiting_for_trigger; }
+    bool IsWaitingForPlaybackTrigger() const { return playback_waiting_for_trigger; }
+    OperationMode GetCurrentMode() const { return current_mode; }
+    bool SaveRecordingData(const wxString& filename);
+    bool LoadPlaybackData(const wxString& filename);
 
 private:
     void OnPaint(wxPaintEvent& event);
@@ -55,6 +91,26 @@ private:
     void SerialReadThread();
     bool DecodeCOBS(const std::vector<uint8_t>& encoded, std::vector<uint8_t>& decoded);
     uint8_t CalculateCRC8(const uint8_t* data, size_t length);
+    
+    // プロトコル関連
+    void SendPlaybackStart();
+    void SendPlaybackData(const ControllerData& data);
+    void SendPlaybackStop();
+    void SendPreloadFrame(const ControllerData& data);  // プリロード専用
+    bool EncodeCOBS(const std::vector<uint8_t>& data, std::vector<uint8_t>& encoded);
+    void ProcessControllerData(const ControllerData& data);  // PC側でのデータ処理
+    
+    // 記録・再生内部処理（PC側中心）
+    void PlaybackThread();
+    void RecordData(const ControllerData& data);
+    void CheckRecordingTrigger(const ControllerData& data);
+    void CheckPlaybackTrigger(const ControllerData& data);
+    bool IsNeutralState(const ControllerData& data);
+    
+    // 遅延補正関連
+    void CalibrateDelay();
+    uint32_t MeasureRoundTripDelay();
+    void PreloadFirstFrame();
     
     void DrawController(wxGraphicsContext* gc);
     void DrawButton(wxGraphicsContext* gc, double x, double y, double radius, bool pressed, const wxString& label);
@@ -76,6 +132,26 @@ private:
     std::mutex dataMutex;
     ControllerData controllerData{};
     bool dataValid{false};
+    
+    // 記録・再生関連（PC側で制御）
+    std::atomic<bool> recording{false};
+    std::atomic<bool> playback_active{false};
+    std::atomic<bool> recording_waiting_for_trigger{false};
+    std::atomic<bool> playback_waiting_for_trigger{false};
+    std::atomic<OperationMode> current_mode{MODE_PASSTHROUGH};
+    std::vector<TimestampedData> recorded_data;
+    std::vector<TimestampedData> playback_data;
+    std::thread playback_thread;
+    std::atomic<bool> should_stop_playback{false};
+    uint32_t recording_start_time{0};
+    uint32_t playback_start_time{0};
+    size_t playback_index{0};
+    bool has_neutral_state{false};  // ニュートラル状態の検出用
+    
+    // 遅延補正関連
+    uint32_t system_delay_ms{50};  // システム遅延(ミリ秒)
+    bool delay_calibrated{false};
+    bool first_frame_preloaded{false};
     
     wxDECLARE_EVENT_TABLE();
 };
