@@ -38,7 +38,7 @@ bool ControllerPanel::ConnectSerial(const wxString& portName)
         return true;
     }
     catch (const std::exception& e) {
-        wxLogError("Serial connection error: %s", e.what());
+        std::cout << "ERROR: Serial connection error: " << e.what() << std::endl;
         return false;
     }
 }
@@ -68,7 +68,7 @@ void ControllerPanel::SerialReadThread()
                          NULL);
     
     if (hSerial == INVALID_HANDLE_VALUE) {
-        wxLogError("Failed to open serial port: %s", currentPort);
+        std::cout << "ERROR: Failed to open serial port: " << currentPort.ToStdString() << std::endl;
         return;
     }
     
@@ -151,20 +151,23 @@ void ControllerPanel::SerialReadThread()
                             // デバッグ出力（初回のみ）
                             static bool firstDataReceived = false;
                             if (!firstDataReceived) {
-                                wxLogMessage("First valid data received: buttons=0x%04X, dpad=0x%02X", 
-                                           newData.buttons, newData.dpad);
+                                std::cout << "First valid data received: buttons=0x" << std::hex << newData.buttons 
+                                         << ", dpad=0x" << std::hex << (int)newData.dpad << std::dec << std::endl;
                                 firstDataReceived = true;
                             }
                         } else {
                             // 詳細なデバッグ情報
                             static int errorCount = 0;
                             if (errorCount++ < 5) { // 最初の5回のエラーのみ表示
-                                wxString dataHex;
+                                std::string dataHex;
                                 for (size_t i = 0; i < decoded.size(); i++) {
-                                    dataHex += wxString::Format("%02X ", decoded[i]);
+                                    char hex[4];
+                                    sprintf_s(hex, "%02X ", decoded[i]);
+                                    dataHex += hex;
                                 }
-                                wxLogMessage("CRC mismatch #%d: expected=0x%02X, calculated=0x%02X, size=%zu, data=[%s]", 
-                                           errorCount, receivedCRC, calculatedCRC, decoded.size(), dataHex);
+                                std::cout << "CRC mismatch #" << errorCount << ": expected=0x" << std::hex << (int)receivedCRC 
+                                         << ", calculated=0x" << std::hex << (int)calculatedCRC << std::dec
+                                         << ", size=" << decoded.size() << ", data=[" << dataHex << "]" << std::endl;
                             }
                         }
                     }

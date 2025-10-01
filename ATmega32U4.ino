@@ -4,6 +4,10 @@
 
 #include <NintendoSwitchControlLibrary.h>
 
+// 両方ともLOWで点灯
+#define LED_RX 17
+#define LED_TX 30
+
 // SPI通信設定
 #define SS_PIN   7    // CS signal from RP2350 Pin 1
 #define MISO_PIN 14   // SPI MISO (unused)

@@ -116,7 +116,7 @@ void MainFrame::OnConnect(wxCommandEvent& event)
     } else {
         int sel = m_comChoice->GetSelection();
         if (sel == wxNOT_FOUND) {
-            wxMessageBox("Please select a COM port.", "Error", wxOK | wxICON_ERROR);
+            std::cout << "ERROR: Please select a COM port." << std::endl;
             return;
         }
 
@@ -126,16 +126,16 @@ void MainFrame::OnConnect(wxCommandEvent& event)
 
         if (m_controllerPanel->ConnectSerial(portStr)) {
             m_connectButton->SetLabel("Disconnect");
-            wxLogMessage("Connected to: %s", portStr);
+            std::cout << "Connected to: " << portStr.ToStdString() << std::endl;
         } else {
-            wxMessageBox("Wrong port or device not connected", "Error", wxOK | wxICON_ERROR);
+            std::cout << "ERROR: Wrong port or device not connected: " << portStr.ToStdString() << std::endl;
         }
     }
 }
 
 void MainFrame::OnRefresh(wxCommandEvent& event)
 {
-    wxLogMessage("Refresh button clicked");
+    std::cout << "Refresh button clicked" << std::endl;
     
     wxString selectedPort;
     if (m_comChoice->GetSelection() != wxNOT_FOUND) {
@@ -152,7 +152,7 @@ void MainFrame::OnRefresh(wxCommandEvent& event)
         }
     }
     
-    wxLogMessage("COM ports refreshed. Found %d ports", m_comChoice->GetCount());
+    std::cout << "COM ports refreshed. Found " << m_comChoice->GetCount() << " ports" << std::endl;
 }
 
 void MainFrame::OnClose(wxCloseEvent& event)
